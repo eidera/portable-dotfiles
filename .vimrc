@@ -336,7 +336,8 @@ augroup MyEtcAuGroup
   autocmd FileType text setlocal textwidth=0
 
   " 常に開いているファイルのディレクトリに移動する
-  autocmd BufReadPost *   execute ":lcd " . expand("%:p:h")
+  "autocmd BufReadPost *   execute ":lcd " . expand("%:p:h")
+  autocmd BufReadPost * if expand("%") != "" && !isdirectory(expand("%:p")) | execute ":lcd " . expand("%:p:h") | endif
 
   " makeやgrep使用時にマッチしたファイルがあったらQuickFixを開くようにする
   autocmd QuickfixCmdPost make,grep,grepadd,vimgrep cw
@@ -403,6 +404,74 @@ augroup MyFiletypeAuGroup
 augroup END
 " }}}
 " 使用しているvim scriptの設定 {{{
+" vim-plugの設定 {{{
+" Install vim-plug if not found
+if empty(glob('~/.vim/autoload/plug.vim'))
+  silent !curl -fLo ~/.vim/autoload/plug.vim --create-dirs
+    \ https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+endif
+
+" Run PlugInstall if there are missing plugins
+autocmd VimEnter * if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
+  \| PlugInstall --sync | source $MYVIMRC
+\| endif
+
+
+function! SetupRtputil(info)
+  call system('mkdir -p ~/.vim/autoload')
+  call system('cp -a ~/.vim/plugged/vim-rtputil/autoload/* ~/.vim/autoload/.')
+endfunction
+
+call plug#begin()
+
+Plug 'thinca/vim-rtputil', { 'commit': 'c477b17e45f6e975ee54102468e9e1f5cd0dffa8', 'do': function('SetupRtputil') }
+Plug 'eidera/BlockDiff', { 'commit': 'eadaf191c18b6a05e398ab42ca7183908fa27d05' }
+Plug 'mileszs/ack.vim', { 'commit': '36e40f9ec91bdbf6f1adf408522a73a6925c3042' } " ag用
+Plug 'junegunn/fzf', { 'tag': 'v0.71.0', 'do': { -> fzf#install() } }
+Plug 'itchyny/lightline.vim', { 'commit': '6c283f8df85aa7219fa4096a6ed4ff45d48aa9e1' }
+Plug 'mattn/vim-maketable', { 'commit': 'd72e73f333c64110524197ec637897bd1464830f' }
+Plug 'simeji/winresizer', { 'commit': '299076f7f79e2e2f7706b2dfacbb3c074ce53257' }
+Plug 'junegunn/vim-easy-align', { 'tag': '2.10.0' }
+Plug 'thinca/vim-fontzoom', { 'commit': 'b411334b6abaaf07380521d8446a59553fc7f57f' }
+Plug 'tpope/vim-surround', {'commit': '3d188ed2113431cf8dac77be61b842acb64433d9' }
+Plug 'tpope/vim-fugitive', {'commit': '3b753cf8c6a4dcde6edee8827d464ba9b8c4a6f0' }
+Plug 'kana/vim-operator-user', {'tag': '0.1.0' }
+Plug 'tyru/operator-camelize.vim', {'commit': '1d029632bc7ba28a8ecf59274d2b958046348611' }
+Plug 'deris/vim-rengbang', { 'commit': 'e8c58cade2208b90dca989abfa9bcf1d79c4e931' }
+Plug 'Omochice/yank-remote-url.vim', { 'commit': '6b6d604ae7bf974d0733340f4d4338491dacab0d' }
+Plug 'aklt/plantuml-syntax', {'commit': '9d4900aa16674bf5bb8296a72b975317d573b547' }
+Plug 'supermomonga/projectlocal.vim', { 'commit': '4cc075b8be68f843d78e6a4cbbe4eaa1ecb1a31d' }
+Plug 'Shougo/vimfiler.vim', {'commit': '69d5bc6070d5b3ff4e73719d970bae50a71d2c67' }
+Plug 'Shougo/vimproc.vim', { 'tag': 'ver.10.0', 'do': 'make' }
+
+" Unite
+Plug 'Shougo/unite.vim', { 'commit': '0ccb3f7988d61a9a86525374be97360bd20db6bc' }
+Plug 'Shougo/neomru.vim', { 'commit': 'd9b92f73f7d9158e803d72f2baeb7da9ea30040e' }
+Plug 'Shougo/unite-outline', { 'commit': '1c0f9c80b9d76421f697be161819106b91c151f3' }
+Plug 'osyo-manga/unite-quickfix', { 'commit': 'f9b8d5f95ff2536abca1e81bd67dc740e5ee24a6' }
+Plug 'Shougo/tabpagebuffer.vim', { 'commit': '4d95c3e6fa5ad887498f4cbe486c11e39d4a1fbc' }
+Plug 'eidera/unite-projectlocal', { 'commit': '47d46c43093c5bbd13a3f92244ee259ed5977ff5' }
+
+" Document
+Plug 'habamax/vim-asciidoctor', { 'commit': 'd45364d662489e0ffcad0e2bc6f41c859ba58799' }
+Plug 'plasticboy/vim-markdown', { 'commit': '1bc9d0cd8e1cc3e901b0a49c2b50a843f1c89397' }
+
+" Language
+Plug 'Quramy/tsuquyomi', { 'commit': 'e1afca562d46907bf63270157c88b7ec8f66e46b' }
+Plug 'leafgarland/typescript-vim', { 'commit': '4740441db1e070ef8366c888c658000dd032e4cb' }
+Plug 'derekwyatt/vim-scala', { 'commit': '7657218f14837395a4e6759f15289bad6febd1b4' }
+Plug 'posva/vim-vue', { 'commit': '6ae8fa751fbe4c6605961d2309f8326873fa40a6' }
+Plug 'jparise/vim-graphql', { 'tag': 'v1.6' }
+Plug 'udalov/kotlin-vim', { 'commit': '53fe045906df8eeb07cb77b078fc93acda6c90b8' }
+Plug 'dart-lang/dart-vim-plugin', { 'commit': 'dd74e59c50e29896483a87373743136f2cbd24e7' }
+Plug 'nikvdp/ejs-syntax', { 'commit': '0e704c523dacfda547215b5936067869e79103c4' }
+Plug 'toyamarinyon/vim-swift', { 'commit': '85025c4af417b5462831935dd7c2d57e4a5559bd' }
+Plug 'slim-template/vim-slim', { 'commit': 'a0a57f75f20a03d5fa798484743e98f4af623926' }
+Plug 'kchmck/vim-coffee-script', { 'commit': '28421258a8dde5a50deafbfc19cd9873cacfaa79' }
+
+call plug#end()
+
+" }}}
 " ProjectLocalの設定 {{{
 let g:projectlocal#projectfile       = get(g:, 'projectlocal#projectfile', '.projectfile')
 let g:projectlocal#ignore_targets    = ['\~$', '^\.idea', '/app/cache/', '/submodules/'] " 無視するパスパターン(ファイル一覧を取得後に間引く)
