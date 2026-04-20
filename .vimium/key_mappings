@@ -1,0 +1,15 @@
+unmap x
+unmap d
+unmap u
+
+map h previousTab
+map l nextTab
+map H goBack
+map L goForward
+map D removeTab
+map s Vomnibar.activateInNewTab
+map U restoreTab
+map <C-d> scrollPageDown
+map <C-u> scrollPageUp
+map <C-f> scrollFullPageDown
+map <C-b> scrollFullPageUp

@@ -1,0 +1,131 @@
+# vim: set fdm=marker :
+startup_message off
+autodetach on
+vbell off
+vbell_msg " Wuff, ---- Wuff!! "
+bell "Bell in window %."
+activity "Activity in window %."
+crlf off
+msgwait 3
+msgminwait 2
+defscrollback 10000
+defutf8 on
+
+# screenが起動している状態に設定
+setenv SCREEN true
+
+# Screen Titleの動的文字列設定
+shelltitle "% |zsh"
+#shelltitle "% |zsh:"
+#shelltitle "%t"
+
+# サーバー側では、以下を有効にする。とりあえず見た目がちょっとだけ変わる。
+#hardstatus alwayslastline '%02c:%s %{= .g}%H%{-} %L=%-w%45L>%{=u g.}%n %t%{-}%+w %-17<%=%{= .y}(%l)'
+
+# caption(screenからのメッセージ)を常に表示(defaultはsplitonly)
+#caption splitonly
+caption always
+#caption always "%{=r dd}%-Lw%40L>%?%F%{=b dR}%:[%? %n%f %t %?%F%{-}%:]%?%+Lw %?%F%-024=GNU Screen of Git master%:%=%?"
+#caption always "%-Lw%40L>%?%F%{=b dR}%:[%? %n%f %t %?%F%{-}%:]%?%+Lw %?%F%-024=GNU Screen of Git master%:%=%?"
+caption always "%-Lw%40L>%?%F%{=b dI}%:[%? %n%f %t %?%F%{-}%:]%?%+Lw"
+#caption always "%?%F%{= wk}%:%{= ww}%?%-w%{=u Wk}%n %t%{-}%+w"
+
+#time "%c:%s (%Y/%m/%d:%D)  %H%? %l%?"
+time "%c:%s (%Y/%m/%d)  %H%? %l%?"
+
+
+# viやlessを終了すると画面を戻す設定
+# alternate screen buffer
+altscreen on
+
+# 現在の背景色で削除する
+defbce on
+
+# 太字には明るい色を使う
+attrcolor b ".I"
+
+# Screenのメッセージ色を変更
+#sorendition "+rb .G"
+#sorendition "+rb bk"
+#sorendition "+rb b."
+#sorendition "+rb B."  ← 他のデフォルト
+#sorendition "+rb R."
+#sorendition "+rb M."  ← マゼンタ
+sorendition "+rb k."
+#sorendition "+rb kb"
+
+# 256色を使用する
+#term vt100
+#term xterm
+term xterm-256color
+
+## cygwin {{{
+##term cygwin
+##termcapinfo xterm KJ=SJIS
+#defencoding SJIS 
+## }}}
+
+# 新しいウィンドウを生成するときのシェルの設定
+#shell $SHELL
+shell zsh
+
+# teratermなどでログインしたときにウィンドウサイズが変わらないようにする
+termcapinfo xterm 'is=\E[r\E[m\E[2J\E[H\E[?7h\E[?1;4;6l'
+
+escape 
+########################################################
+# 危険なkeybindを削除
+# 現在のwindowを破棄を無効
+bind 'k'
+bind ''
+# termcapファイルの出力を無効
+bind '.'
+# 全windowを破棄してscreenを終了を無効
+bind ''
+# screenの可視ベル(vbell)をトグルするを無効
+bind ''
+########################################################
+
+#bind '\\' quit
+bind '\' quit
+bind 'K' kill
+bind 'Z' suspend
+bind 'z' suspend
+bind 'G' vbell
+bind 'R' reset
+bind 'j' next
+bind 'k' prev
+#bind 'P' screen 9 ppp
+
+# 以下、JISキーボードのキー配置をUSに合わせた設定
+#bind '*'  windowlist -b
+#bind '(' displays
+
+#######################################################
+# resizeの設定
+bind r eval 'echo "Resize window"' 'command -c resize'
+bind -c resize ^] command
+bind -c resize j eval 'resize +1' 'command -c resize'
+bind -c resize l eval 'resize +1' 'command -c resize'
+bind -c resize k eval 'resize -1' 'command -c resize'
+bind -c resize h eval 'resize -1' 'command -c resize'
+#######################################################
+
+# でクリップボードにコピー＆ファイル削除(mac, linux, BSD全環境対応。最初の成功したクリップボードコピーコマンドで実行が終了する)
+#bind C eval 'writebuf /tmp/screen-clipboard' 'exec sh -c "{ pbcopy < /tmp/screen-clipboard || xsel -i -b < /tmp/screen-clipboard || xclip -selection clipboard < /tmp/screen-clipboard || wl-copy < /tmp/screen-clipboard; } && rm -f /tmp/screen-clipboard"'
+#bind C eval 'writebuf /tmp/screen-clipboard' 'exec sh -c "~/bin/xcopy < /tmp/screen-clipboard && rm -f /tmp/screen-clipboard"'
+bind C eval 'writebuf /tmp/screen-clipboard' 'exec !!! sh -c "~/bin/xcopy < /tmp/screen-clipboard && rm -f /tmp/screen-clipboard"'
+#  exec は現在のウィンドウのI/Oにコマンドを接続してしまうため、xcopy が正しくstdinを読めません。!!! を付けることでstdin/stdout/stderrをウィンドウから切り離せます：
+#    !!! の意味：
+#    - 1つ目の ! → stdinをウィンドウに接続しない
+#    - 2つ目の ! → stdoutをウィンドウに接続しない
+#    - 3つ目の ! → stderrをウィンドウに接続しない
+
+#screen -t '*Scratch*' 0 sh -c 'cat > /dev/null'
+#screen -t 'memo' 0 /usr/local/bin/vi -c 'set bg=light' -c 'call qfixmemo#OpenMenu("cache")'
+#screen -t 'memo' 0 /usr/local/bin/vi -c 'set bg=light' -c 'Unite qfixhowm:nocache' -c 'quit' -c 'call qfixmemo#OpenMenu("cache")'
+#screen -t 'zsh' 0 zsh -l
+#screen -t 'zsh main' 1 zsh -l
+screen -t 'zsh' 0 zsh
+screen -t 'zsh main' 1 zsh
+select 1

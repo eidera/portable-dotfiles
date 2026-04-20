@@ -1,0 +1,46 @@
+.projectfile
+.tmp
+.ipynb_checkpoints
+docker-compose.mylocal.yml
+.envrc.mine
+.cursorignore
+.clineignore
+.vscode
+.agents
+.claude
+.mcp.json
+mise.local.toml
+
+# Mac {{{
+.DS_Store
+# }}}
+# Vim {{{
+# https://github.com/github/gitignore/blob/master/Global/Vim.gitignore
+# Swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
+
+# Session
+Session.vim
+
+# Temporary
+.netrwhist
+*~
+# Auto-generated tag files
+tags
+# }}}
+# IntelliJ IDEA {{{
+/.idea
+/.idea_modules
+# }}}
+# direnv {{{
+.envrc
+.direnv
+# }}}
+# xxxenv {{{
+.tool-versions
+.python-version
+# }}}
+# vim: set fdm=marker ro:

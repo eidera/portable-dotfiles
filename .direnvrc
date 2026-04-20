@@ -1,0 +1,36 @@
+ALIASES_DIR=".direnv/aliases"
+
+export_function() {
+  local name=$1
+  local alias_dir=$PWD/${ALIASES_DIR}
+  mkdir -p "$alias_dir"
+  PATH_add "$alias_dir"
+  local target="$alias_dir/$name"
+  if declare -f "$name" >/dev/null; then
+    echo "#!/usr/bin/env bash" > "$target"
+    declare -f "$name" >> "$target" 2>/dev/null
+    echo "$name" '"$@"' >> "$target"
+    chmod +x "$target"
+  fi
+}
+
+clear_direnv_aliases() {
+  local alias_dir=$PWD/${ALIASES_DIR}
+  rm -rf $alias_dir/*
+}
+
+### .envrc がプロジェクト共通のものとして commit されている環境で、自分の direnv を使いたいとき用。通常は使用しない: .envrc.mine {{{
+
+load_my_env () {
+  local MY_ENV_FILE="$PWD/.envrc.mine"
+
+  if [ ! -e "$MY_ENV_FILE" ] ; then
+    return
+  fi
+
+  source $MY_ENV_FILE
+}
+
+load_my_env
+
+### }}}
