@@ -327,3 +327,8 @@ eval "$(direnv hook zsh)"
 eval "$(~/.local/bin/mise activate zsh)"
 export FZF_DEFAULT_OPTS='--reverse --multi --cycle --tiebreak=index --bind=ctrl-a:toggle-all'
 ## }}}
+
+# 各環境用の設定相違点の吸収用
+if [ -e ~/.zsh_local/local.zshrc ] ; then
+  source ~/.zsh_local/local.zshrc
+fi
