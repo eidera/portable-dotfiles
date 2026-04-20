@@ -441,8 +441,10 @@ Plug 'deris/vim-rengbang', { 'commit': 'e8c58cade2208b90dca989abfa9bcf1d79c4e931
 Plug 'Omochice/yank-remote-url.vim', { 'commit': '6b6d604ae7bf974d0733340f4d4338491dacab0d' }
 Plug 'aklt/plantuml-syntax', {'commit': '9d4900aa16674bf5bb8296a72b975317d573b547' }
 Plug 'supermomonga/projectlocal.vim', { 'commit': '4cc075b8be68f843d78e6a4cbbe4eaa1ecb1a31d' }
+Plug 'vim-scripts/MultipleSearch', { 'tag': '1.3' }
 Plug 'Shougo/vimfiler.vim', {'commit': '69d5bc6070d5b3ff4e73719d970bae50a71d2c67' }
 Plug 'Shougo/vimproc.vim', { 'tag': 'ver.10.0', 'do': 'make' }
+Plug 'vim-jp/vimdoc-ja', {'commit': 'ee16ecb8f802287302ff0317e52e27c274c16194' }
 
 " Unite
 Plug 'Shougo/unite.vim', { 'commit': '0ccb3f7988d61a9a86525374be97360bd20db6bc' }
@@ -809,6 +811,9 @@ vmap ga <Plug>(EasyAlign)
 " vim-rengbang の設定 {{{
 " ref: https://github.com/deris/vim-rengbang
 let g:rengbang_default_start    = 1 " default: 0
+" }}}
+" MultipleSearchの設定 {{{
+let g:MultipleSearchMaxColors = 8 " default: 4  設定できる最大値は8っぽい
 " }}}
 " WinResizer {{{
 " ref: https://github.com/simeji/winresizer
