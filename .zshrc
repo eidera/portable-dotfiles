@@ -65,6 +65,55 @@ esac
 ## load library path
 export LD_LIBRARY_PATH=/usr/local/lib
 # }}}
+# Prompt {{{
+autoload colors
+colors
+zmodload zsh/datetime
+
+# 実行時間計測
+preexec() {
+  _cmd_start=$EPOCHREALTIME
+}
+
+precmd() {
+  if [[ -n $_cmd_start ]]; then
+    local elapsed=$(( EPOCHREALTIME - _cmd_start ))
+    local total_sec=$(( ${elapsed%.*} ))
+
+    local h=$(( total_sec / 3600 ))
+    local m=$(( (total_sec % 3600) / 60 ))
+    local s=$(( total_sec % 60 ))
+    local ms_raw=$(( (elapsed - total_sec) * 1000 ))
+    local ms=${ms_raw%.*}
+
+    _cmd_elapsed="${h}h-${m}m-${s}s-${ms}ms ${total_sec}s"
+  else
+    _cmd_elapsed=""
+  fi
+  unset _cmd_start
+}
+
+git_branch() {
+  local branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+  [[ -n "$branch" ]] && echo " (${branch})"
+}
+
+prompt_setting() {
+  setopt prompt_subst
+
+  # ╭─ と ╰─❯ の色：成功=green、失敗=red
+  local sc='%0(?|%{${fg[green]}%}|%{${fg[red]}%})'
+
+  local git_str="%{${fg[yellow]}%}"'$(git_branch)'"%{${reset_color}%}"
+  local date_str="%{${fg[green]}%}%D %*%{${reset_color}%}"
+  local exec_time="%{${fg[cyan]}%}"'[${_cmd_elapsed}]'"%{${reset_color}%}"
+
+  PROMPT="$sc╭─%{${reset_color}%} %{${fg[green]}%}%m(\`whoami\`)[%c]%{${reset_color}%}$git_str $date_str $exec_time
+$sc╰─❯%{${reset_color}%} "
+}
+
+prompt_setting
+# }}}
 ## Useful setting {{{
 setopt auto_cd
 setopt auto_pushd
@@ -321,6 +370,18 @@ alias rm='rm -i'       # no spelling correction on rm
 
 alias projectlocal="vi -c 'silent call MakeProjectFileForProjectlocal() | quit'"
 alias pvi='vi -c "set paste"'
+
+# Mac用 {{{
+case "$(uname -s)" in
+  Darwin) # mac
+    #alias vi='vi -c "set bg=light"'		# for Solarized on iTerm2
+    alias vi='/Applications/MacVim.app/Contents/MacOS/Vim -c "set bg=light"'
+    alias gvim='/Applications/MacVim.app/Contents/bin/mvim --remote-tab'
+    alias gitx="open -a gitx"
+    alias yoink='open -a Yoink'
+  ;;
+esac
+# }}}
 
 ## other settings {{{
 eval "$(direnv hook zsh)"
