@@ -324,7 +324,11 @@ alias pvi='vi -c "set paste"'
 
 ## other settings {{{
 eval "$(direnv hook zsh)"
-eval "$(~/.local/bin/mise activate zsh)"
+
+if [ -e ~/.local/bin/mise ] ; then
+  eval "$(~/.local/bin/mise activate zsh)"
+fi
+
 export FZF_DEFAULT_OPTS='--reverse --multi --cycle --tiebreak=index --bind=ctrl-a:toggle-all'
 ## }}}
 
