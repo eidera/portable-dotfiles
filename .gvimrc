@@ -10,7 +10,7 @@ set nohls
 " カラーテーマを設定
 gui
 set background=dark
-colorscheme mysolarized
+colorscheme solarized
 
 
 " window サイズ変更ショートカット関数 {{{
@@ -39,6 +39,6 @@ function! FontChange0xProto()
 endfunction
 
 " default font setting: guifont関連を設定すると `:intro` の起動時メッセージが表示されなくなる模様
-"call FontChange0xProto()
-call FontChangeOsaka()
+call FontChange0xProto()
+"call FontChangeOsaka()
 " }}}
