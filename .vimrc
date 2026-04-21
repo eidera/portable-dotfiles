@@ -444,7 +444,9 @@ Plug 'supermomonga/projectlocal.vim', { 'commit': '4cc075b8be68f843d78e6a4cbbe4e
 Plug 'vim-scripts/MultipleSearch', { 'tag': '1.3' }
 Plug 'Shougo/vimfiler.vim', {'commit': '69d5bc6070d5b3ff4e73719d970bae50a71d2c67' }
 Plug 'Shougo/vimproc.vim', { 'tag': 'ver.10.0', 'do': 'make' }
+
 Plug 'vim-jp/vimdoc-ja', {'commit': 'ee16ecb8f802287302ff0317e52e27c274c16194' }
+Plug 'altercation/vim-colors-solarized', {'commit': '528a59f26d12278698bb946f8fb82a63711eec21' }
 
 " Unite
 Plug 'Shougo/unite.vim', { 'commit': '0ccb3f7988d61a9a86525374be97360bd20db6bc' }
