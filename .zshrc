@@ -443,6 +443,8 @@ alias pvi='vi -c "set paste"'
 alias delBackupFiles='files=(*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
 alias delBackupFilesRecursive='files=(**/*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
 
+alias cdp='cdf .projectfile'
+
 # Mac用 {{{
 case "$(uname -s)" in
   Darwin) # mac
