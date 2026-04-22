@@ -66,58 +66,82 @@ esac
 export LD_LIBRARY_PATH=/usr/local/lib
 # }}}
 # Prompt {{{
-autoload colors
-colors
+autoload colors; colors
+autoload vcs_info
 zmodload zsh/datetime
+zmodload zsh/mathfunc
 
-# 実行時間計測
+# --- vcs_info 設定 ---
+zstyle ":vcs_info:*"       enable            git
+zstyle ":vcs_info:git:*"   check-for-changes true
+zstyle ":vcs_info:git:*"   formats           "[%b : %r] %F{magenta}%c%u%f"
+zstyle ":vcs_info:git:*"   actionformats     "[%b : %r] %F{magenta}%c%u<%a>%f"
+zstyle ":vcs_info:git:*"   unstagedstr       "M"
+zstyle ":vcs_info:git:*"   stagedstr         "C"
+
+# --- preexec / precmd ---
 preexec() {
   _cmd_start=$EPOCHREALTIME
 }
 
 precmd() {
+  # 実行時間の計算
   if [[ -n $_cmd_start ]]; then
     local elapsed=$(( EPOCHREALTIME - _cmd_start ))
-    local total_sec=$(( ${elapsed%.*} ))
-
+    local total_sec=$(( int(elapsed) ))
+    local ms=$(( int((elapsed - total_sec) * 1000) ))
     local h=$(( total_sec / 3600 ))
-    local m=$(( (total_sec % 3600) / 60 ))
+    local m=$(( total_sec % 3600 / 60 ))
     local s=$(( total_sec % 60 ))
-    local ms_raw=$(( (elapsed - total_sec) * 1000 ))
-    local ms=${ms_raw%.*}
-
     _cmd_elapsed="${h}h-${m}m-${s}s-${ms}ms ${total_sec}s"
   else
     _cmd_elapsed=""
   fi
   unset _cmd_start
+
+  # git情報をキャッシュ
+  vcs_info
+  if [[ -z $vcs_info_msg_0_ ]]; then
+    _git_info=""
+    return
+  fi
+
+  local extras=""
+  git status -s 2>/dev/null | grep -q "^??" && extras+="?"
+
+  if [[ -n $(git remote 2>/dev/null) ]]; then
+    local head=$(git rev-parse HEAD 2>/dev/null)
+    git rev-parse --remotes 2>/dev/null | grep -qF "$head" || extras+="P"
+  fi
+
+  if git stash list 2>/dev/null | grep -q .; then
+    [[ -n $extras ]] && extras+=" "
+    extras+="{Has Stash}"
+  fi
+
+  local vcs_base="${vcs_info_msg_0_%\%f}"
+
+  if [[ $vcs_base == *"%F{magenta}" && -z $extras ]]; then
+    _git_info=" ${vcs_base% %F\{magenta\}}"
+  else
+    _git_info=" ${vcs_base}${extras}%f"
+  fi
 }
 
-git_branch() {
-  local branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-  [[ -n "$branch" ]] && echo " (${branch})"
-}
+# --- プロンプト設定 ---
+setopt prompt_subst
 
-prompt_setting() {
-  setopt prompt_subst
+local sc='%0(?|%{${fg[green]}%}|%{${fg[red]}%})'
+local git_str="%{${fg[yellow]}%}"'${_git_info}'"%{${reset_color}%}"
+local date_str="%{${fg[green]}%}%D %*%{${reset_color}%}"
+local exec_time="%{${fg[cyan]}%}"'[${_cmd_elapsed}]'"%{${reset_color}%}"
 
-  # ╭─ と ╰─❯ の色：成功=green、失敗=red
-  local sc='%0(?|%{${fg[green]}%}|%{${fg[red]}%})'
-
-  local git_str="%{${fg[yellow]}%}"'$(git_branch)'"%{${reset_color}%}"
-  local date_str="%{${fg[green]}%}%D %*%{${reset_color}%}"
-  local exec_time="%{${fg[cyan]}%}"'[${_cmd_elapsed}]'"%{${reset_color}%}"
-
-  PROMPT="$sc╭─%{${reset_color}%} %{${fg[green]}%}%m(\`whoami\`)[%c]%{${reset_color}%}$git_str $date_str $exec_time
+PROMPT="$sc╭─%{${reset_color}%} %{${fg[green]}%}%m(\`whoami\`)[%c]%{${reset_color}%}$git_str $date_str $exec_time
 $sc╰─❯%{${reset_color}%} "
-}
 
-prompt_setting
+RPROMPT="%{${fg[yellow]}%}%{${bg[black]}%}[%/]%{${reset_color}%}"
 
-# Screen用にプロンプトの設定。Screenを使用時には、.screenrc内で環境変数SCREENがtrueに定義されている。
-if [ "true" = "$SCREEN" ] ; then
-  PROMPT=$'\033k%~\033\134'$PROMPT
-fi
+[[ $SCREEN == "true" ]] && PROMPT=$'\033k%~\033\134'$PROMPT
 # }}}
 ## Useful setting {{{
 setopt auto_cd
