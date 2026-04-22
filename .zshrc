@@ -167,6 +167,46 @@ compinit
 
 ## zsh editor
 autoload zed
+
+# 指定したファイルが存在するまでディレクトリを遡ってcdする {{{
+# cdf - cd to the nearest ancestor directory containing a specific file
+#
+# Usage: cdf <filename>
+#   Searches from the current directory up to / for <filename>.
+#   If found in a parent directory, cd to that directory.
+#   If found in the current directory, do nothing.
+
+cdf() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: cdf <filename>" >&2
+    return 1
+  fi
+
+  local target="$1"
+  local dir="$PWD"
+
+  if [[ -e "$dir/$target" ]]; then
+    echo "'$target' is in the current directory." >&2
+    return 0
+  fi
+
+  while true; do
+    dir="${dir%/*}"
+    [[ -z "$dir" ]] && dir="/"
+
+    if [[ -e "$dir/$target" ]]; then
+      cd "$dir" || return 1
+      echo "$dir" >&2
+      return 0
+    fi
+
+    [[ "$dir" == "/" ]] && break
+  done
+
+  echo "'$target' not found." >&2
+  return 1
+}
+# }}}
 # }}}
 ## Extension setting {{{
 case "$(uname -s)" in
