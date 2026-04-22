@@ -113,6 +113,11 @@ $sc╰─❯%{${reset_color}%} "
 }
 
 prompt_setting
+
+# Screen用にプロンプトの設定。Screenを使用時には、.screenrc内で環境変数SCREENがtrueに定義されている。
+if [ "true" = "$SCREEN" ] ; then
+  PROMPT=$'\033k%~\033\134'$PROMPT
+fi
 # }}}
 ## Useful setting {{{
 setopt auto_cd
