@@ -416,6 +416,9 @@ alias rm='rm -i'       # no spelling correction on rm
 alias projectlocal="vi -c 'silent call MakeProjectFileForProjectlocal() | quit'"
 alias pvi='vi -c "set paste"'
 
+alias delBackupFiles='files=(*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
+alias delBackupFilesRecursive='files=(**/*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
+
 # Mac用 {{{
 case "$(uname -s)" in
   Darwin) # mac
