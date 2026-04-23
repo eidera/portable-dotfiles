@@ -311,7 +311,7 @@ if has("mac")
     \ }))
   endfunction
 
-  nnoremap <C-W><C-C> :<C-U>call OpenWithEditor()<CR>
+  nnoremap <C-W><C-E> :<C-U>call OpenWithEditor()<CR>
 endif
 " }}}
 " utf8で開きなおす {{{
