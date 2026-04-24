@@ -440,8 +440,35 @@ alias rm='rm -i'       # no spelling correction on rm
 alias projectlocal="vi -c 'silent call MakeProjectFileForProjectlocal() | quit'"
 alias pvi='vi -c "set paste"'
 
-alias delBackupFiles='files=(*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
-alias delBackupFilesRecursive='files=(**/*~(N)); (( ${#files} == 0 )) && echo "対象ファイルなし" && return; print -l $files; read "ans?削除しますか? [y/N]: "; [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"'
+delBackupFiles() {
+  local files=(*~(N) .*~(N))
+  (( ${#files} == 0 )) && echo "対象ファイルなし" && return
+  print -l $files
+  read "ans?削除しますか? [y/N]: "
+  [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"
+}
+
+delBackupFilesRecursive() {
+  local files=(**/*~(N) **/.*~(N))
+  (( ${#files} == 0 )) && echo "対象ファイルなし" && return
+  print -l $files
+  read "ans?削除しますか? [y/N]: "
+  [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"
+}
+
+delMacMetadata() {
+  local files=("${(@f)$(find . \( -name "._*" -o -name ".DS_Store" \) -type f)}")
+  (( ${#files} == 0 )) || [[ -z "$files[1]" ]] && echo "対象ファイルなし" && return
+  print -l $files
+  echo ""
+  read "answer?本当に削除しますか? (y/N): "
+  if [[ "$answer" == "y" ]]; then
+    find . \( -name "._*" -o -name ".DS_Store" \) -type f -print0 | xargs -0 rm -v
+    echo "削除完了！"
+  else
+    echo "キャンセルしました"
+  fi
+}
 
 alias cdp='cdf .projectfile'
 
