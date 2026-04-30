@@ -282,6 +282,19 @@ endfunction
 " ↓「:wq」と同じだと思われる
 nnoremap <C-W><C-Q> nop
 " }}}
+" project-localのrootにcd {{{
+function! CdCurrentFile()
+  exe 'lcd %:h'
+endfunction
+nnoremap ,cdf :<C-U>call CdCurrentFile()<CR>
+" }}}
+" project-localのrootにcd {{{
+function! CdProjectRoot()
+  let path = unite#sources#projectlocal#helper#projectlocal_root()
+  exe 'lcd ' . path
+endfunction
+nnoremap ,cdp :<C-U>call CdProjectRoot()<CR>
+" }}}
 " terminal modeの設定{{{
 tmap <C-W>[ <C-W>N " terminal-normalモードへの移行キーをscreenぽいキーバインドを追加
 
