@@ -336,6 +336,39 @@ nnoremap ,,n :set number!<CR>
 " 相対行番号のトグル: relativenumber と norelativenumber をトグル
 nnoremap ,,r :set relativenumber!<CR>
 " }}}
+" wrap表示関連 {{{
+" wrap設定のトグル: wrap と nowrap をトグル
+nnoremap ,,w :set wrap!<CR>
+
+set breakindentopt=shift:2 " デフォルトは2にしておく
+
+function! ToggleBreakIndent()
+  if &breakindent
+    set nobreakindent
+    set showbreak=
+  else
+    " 現在のshift値を取得（設定がなければ0をデフォルトに）
+    let current = matchstr(&breakindentopt, 'shift:\zs\d\+')
+    let current = empty(current) ? '0' : current
+
+    let value = input("break indent shift value (current: " . current . "): ")
+
+    set breakindent
+    set showbreak=↪\ 
+
+    if value =~ '^\d\+$'
+      let &breakindentopt = "shift:" . value
+    elseif empty(value)
+      " 空入力なら現状維持
+      let &breakindentopt = "shift:" . current
+    else
+      echo "\nInvalid value. Keeping current (" . current . ")."
+      let &breakindentopt = "shift:" . current
+    endif
+  endif
+endfunction
+nnoremap ,,b :call ToggleBreakIndent()<CR>
+" }}}
 " 色々 {{{
 " C-a,C-xで8進数を削除する
 set nrformats-=octal
