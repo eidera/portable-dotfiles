@@ -513,6 +513,7 @@ Plug 'Shougo/unite-outline', { 'commit': '1c0f9c80b9d76421f697be161819106b91c151
 Plug 'osyo-manga/unite-quickfix', { 'commit': 'f9b8d5f95ff2536abca1e81bd67dc740e5ee24a6' }
 Plug 'Shougo/tabpagebuffer.vim', { 'commit': '4d95c3e6fa5ad887498f4cbe486c11e39d4a1fbc' }
 Plug 'eidera/unite-projectlocal', { 'commit': '47d46c43093c5bbd13a3f92244ee259ed5977ff5' }
+Plug 'eidera/unite-bm', { 'commit': '13ff0716d9708992812a279b0e3b8b2474e5f0e2' }
 
 " Document
 Plug 'habamax/vim-asciidoctor', { 'commit': 'd45364d662489e0ffcad0e2bc6f41c859ba58799' }
