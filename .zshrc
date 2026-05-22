@@ -40,7 +40,7 @@ case ${UID} in
     esac
 
     # 全環境共通home系
-    NEW_PATH=${HOME}/build/local/bin:${HOME}/bin:${HOME}/bin/personal:${GOPATH}/bin:${HOME}/.fzf/bin:${NEW_PATH}
+    NEW_PATH=${HOME}/build/local/bin:${HOME}/bin:${HOME}/bin/personal:${HOME}/bin/staging:${HOME}/bin/local:${GOPATH}/bin:${HOME}/.fzf/bin:${NEW_PATH}
 
     # 環境依存home系
     case "$(uname -s)" in
