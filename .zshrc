@@ -441,15 +441,30 @@ alias projectlocal="vi -c 'silent call MakeProjectFileForProjectlocal() | quit'"
 alias pvi='vi -c "set paste"'
 
 delBackupFiles() {
-  local files=(*~(N) .*~(N))
-  (( ${#files} == 0 )) && echo "対象ファイルなし" && return
-  print -l $files
-  read "ans?削除しますか? [y/N]: "
-  [[ $ans == [yY] ]] && rm -f $files && echo "削除しました。" || echo "キャンセルしました。"
-}
+  local recursive=false
+  local target_dir="."
 
-delBackupFilesRecursive() {
-  local files=(**/*~(N) **/.*~(N))
+  for arg in "$@"; do
+    case "$arg" in
+      -r) recursive=true ;;
+      -*) echo "不明なオプション: $arg" >&2; return 1 ;;
+      *) target_dir="$arg" ;;
+    esac
+  done
+
+  if [[ ! -d "$target_dir" ]]; then
+    echo "ディレクトリが見つかりません: $target_dir" >&2
+    return 1
+  fi
+
+  local dir="${target_dir%/}"
+  local files
+  if $recursive; then
+    files=("${dir}"/**/*~(N) "${dir}"/**/.*~(N))
+  else
+    files=("${dir}"/*~(N) "${dir}"/.*~(N))
+  fi
+
   (( ${#files} == 0 )) && echo "対象ファイルなし" && return
   print -l $files
   read "ans?削除しますか? [y/N]: "
