@@ -40,12 +40,12 @@ case ${UID} in
     esac
 
     # 全環境共通home系
-    NEW_PATH=${HOME}/build/local/bin:${HOME}/bin:${GOPATH}/bin:${HOME}/.fzf/bin:${NEW_PATH}
+    NEW_PATH=${HOME}/build/local/bin:${HOME}/bin:${HOME}/bin/personal:${GOPATH}/bin:${HOME}/.fzf/bin:${NEW_PATH}
 
     # 環境依存home系
     case "$(uname -s)" in
       Darwin)
-        NEW_PATH=${HOME}/build/others/jetbrains/bin:${NEW_PATH}
+        NEW_PATH=${HOME}/bin/mac:${HOME}/build/others/jetbrains/bin:${NEW_PATH}
       ;;
       Linux)
         NEW_PATH=${HOME}/bin/ubuntu:${NEW_PATH}
@@ -197,6 +197,153 @@ compinit
 ## zsh editor
 autoload zed
 
+## Command Logger: 実行したコマンドとその結果をクリップボードにコピーしつつ、結果は標準出力にも表示する {{{
+function commandLogger() {
+    # 実行時のコマンド名を取得
+    local cmd_name="${funcstack[1]:-$0}"
+    cmd_name=$(basename "$cmd_name")
+
+    # オプションと実行コマンドを格納する変数
+    local show_timestamp=false
+    local show_time=false
+
+    # オプションの解析
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -t|--timestamp)
+                show_timestamp=true
+                shift
+                ;;
+            --time)
+                show_time=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    # コマンドが空の場合は使い方を表示
+    if (( $# == 0 )); then
+        echo "Usage: $cmd_name [-t|--timestamp] [--time] command [args...]"
+        return 1
+    fi
+
+    # コマンドライン全体を1つの文字列として結合
+    local cmd=""
+    for arg in "$@"; do
+        if [[ -z "$cmd" ]]; then
+            cmd="$arg"
+        else
+            # スペースを含む引数は適切にクォート
+            if [[ "$arg" =~ [[:space:]] ]]; then
+                cmd="$cmd '$arg'"
+            else
+                cmd="$cmd $arg"
+            fi
+        fi
+    done
+
+    # 実行時間計測の準備
+    local start_time=""
+    local end_time=""
+    local elapsed=""
+    local time_str=""
+    local output=""
+
+    # コマンドを1回だけ実行して結果を保存
+    if $show_time; then
+        start_time=$(date +%s.%N)
+        output=$(eval "$cmd")
+        end_time=$(date +%s.%N)
+        elapsed=$(echo "$end_time - $start_time" | bc)
+        elapsed=$(printf "%.2f" $elapsed)
+
+        # 秒数を時分秒に変換
+        local hours=$(echo "$elapsed/3600" | bc)
+        local mins=$(echo "($elapsed-$hours*3600)/60" | bc)
+        local secs=$(echo "$elapsed-$hours*3600-$mins*60" | bc)
+        secs=$(printf "%.2f" $secs)
+
+        if (( ${hours%.*} > 0 )); then
+            time_str="${hours%.*}h${mins%.*}m${secs}s"
+        elif (( ${mins%.*} > 0 )); then
+            time_str="${mins%.*}m${secs}s"
+        else
+            time_str="${secs}s"
+        fi
+    else
+        output=$(eval "$cmd")
+    fi
+
+    # クリップボードへコピー
+    if $show_timestamp || $show_time; then
+        local timestamp=""
+        local suffix=""
+
+        if $show_timestamp; then
+            timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+            suffix="# $timestamp"
+        fi
+
+        {
+            echo "$ $cmd    $suffix"
+            echo "$output"
+
+            if $show_time; then
+                echo "Time: ${elapsed}s ($time_str)"
+            fi
+        } | pbcopy
+    else
+        {
+            echo "$ $cmd"
+            echo "$output"
+        } | pbcopy
+    fi
+
+    # 標準出力に表示
+    echo "$output"
+    if $show_time; then
+        echo "Time: ${elapsed}s ($time_str)" >&2
+    fi
+}
+alias cl='commandLogger'
+
+# 補完設定
+function _commandLogger() {
+    local context state state_descr line
+    typeset -A opt_args
+
+    # clコマンドのオプション定義
+    _arguments \
+        '(-t --timestamp)'{-t,--timestamp}'[Add timestamp]' \
+        '--time[Show execution time]' \
+        '*:: :->command' \
+        && return 0
+
+    # オプション以外の引数の補完
+    case $state in
+        command)
+            # 通常のコマンド補完を実行
+            _normal
+            ;;
+    esac
+}
+
+# 補完の登録
+compdef _commandLogger commandLogger
+compdef _commandLogger cl
+
+function wrap-in-cl() {
+    BUFFER="cl '$BUFFER'"
+    CURSOR=$#BUFFER
+}
+zle -N wrap-in-cl
+
+# Ctrl+tにバインド
+bindkey '^t' wrap-in-cl
+## }}}
 # 指定したファイルが存在するまでディレクトリを遡ってcdする {{{
 # cdf - cd to the nearest ancestor directory containing a specific file
 #
@@ -234,6 +381,41 @@ cdf() {
 
   echo "'$target' not found." >&2
   return 1
+}
+# }}}
+# 長い処理時間がかかった場合に処理時間を表示する {{{
+#REPORTTIME=30	# 30 sec
+
+# 長い処理時間がかかった場合に通知センター又はgrowlに通知する(3秒)
+
+local COMMAND=""
+local COMMAND_TIME=""
+local PREVIOUS_COMMAND_TIME=""
+precmd() {
+  if [ "$COMMAND_TIME" -ne "0" ] ; then
+    local d=`date +%s`
+    d=`expr $d - $COMMAND_TIME`
+    if [ "$d" -ge "3" ] ; then
+      COMMAND="$COMMAND "
+      case "$(uname -s)" in
+        Linux) # linux
+          notify-send -t 5000 "$COMMAND" "DONE! $d [sec]\nzsh on iTerm"
+        ;;
+      esac
+      case "$(uname -s)" in
+        Darwin) # mac
+          terminal-notifier -title "$COMMAND" -subtitle "DONE! $d [sec]" -message "zsh on iTerm"
+        ;;
+      esac
+    fi
+  fi
+  COMMAND="0"
+  COMMAND_TIME="0"
+}
+preexec () {
+  COMMAND="${1}"
+  COMMAND_TIME=`date +%s`
+  PREVIOUS_COMMAND_TIME="${COMMAND_TIME}"
 }
 # }}}
 # }}}
@@ -296,6 +478,60 @@ function fzf-select-branch() {
 }
 zle -N fzf-select-branch
 bindkey "^o^b" fzf-select-branch
+## }}}
+## C-o C-p pでbmのブックマークのパスを取得 {{{
+function fzf-select-bookmark() {
+    local bookmarks=$(bm list 2> /dev/null)
+    if [ ! -n "$bookmarks" ] ; then
+      return
+    fi
+
+    BUFFER="$BUFFER$(echo $bookmarks | fzf --prompt '[SELECT BOOKMARK: path] ' | sed 's/^[^:]*: //')"
+    CURSOR=$#BUFFER
+    zle redisplay
+}
+zle -N fzf-select-bookmark
+bindkey "^o^pp" fzf-select-bookmark
+## }}}
+## C-o C-p iでbmのブックマークのidentityを取得 {{{
+function fzf-select-identity() {
+    local bookmarks=$(bm list 2> /dev/null)
+    if [ ! -n "$bookmarks" ] ; then
+      return
+    fi
+
+    BUFFER="$BUFFER$(echo $bookmarks | fzf --prompt '[SELECT BOOKMARK: identity] ' | /usr/bin/awk -F ' ' '{print $1}')"
+    CURSOR=$#BUFFER
+    zle redisplay
+}
+zle -N fzf-select-identity
+bindkey "^o^pi" fzf-select-identity
+## }}}
+## C-o C-oでbmのブックマークをオープン {{{
+# ディレクトリだったらcd
+# ファイルだったらgvimでオープン
+function fzf-open-bookmark() {
+    local bookmarks=$(bm list 2> /dev/null)
+    if [ ! -n "$bookmarks" ] ; then
+      return
+    fi
+
+    local target_path="$(echo $bookmarks | fzf --prompt '[OPEN BOOKMARK] ' | sed 's/^[^:]*: //')"
+    if [ ! -n "$target_path" ] ; then
+      return
+    fi
+
+    if [ -f "$target_path" ]; then
+      BUFFER="gvim ${(q)target_path}"
+    fi
+    if [ -d "$target_path" ]; then
+      BUFFER="cd ${(q)target_path}"
+    fi
+    #zle reset-prompt
+    zle accept-line
+}
+zle -N fzf-open-bookmark
+bindkey "^o^o" fzf-open-bookmark
 ## }}}
 ## C-o C-p fでカレントディレクトリ以下のファイルパスを取得 {{{
 function fzf-open-under-file() {
@@ -395,11 +631,51 @@ compdef _extended_cd extended_cd
 alias c="extended_cd"
 # }}}
 ## terminal configuration {{{
+#
 case "${TERM}" in
 screen)
     TERM=xterm
     ;;
 esac
+
+case "${TERM}" in
+xterm|xterm-color)
+    #export LSCOLORS=exfxcxdxbxegedabagacad
+    #export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+    zstyle ':completion:*' list-colors 'di=34' 'ln=35' 'so=32' 'ex=31' 'bd=46;34' 'cd=43;34'
+    ;;
+kterm-color)
+    stty erase '^H'
+    #export LSCOLORS=exfxcxdxbxegedabagacad
+    #export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+    zstyle ':completion:*' list-colors 'di=34' 'ln=35' 'so=32' 'ex=31' 'bd=46;34' 'cd=43;34'
+    ;;
+kterm)
+    stty erase '^H'
+    ;;
+cons25)
+    unset LANG
+    #export LSCOLORS=ExFxCxdxBxegedabagacad
+    #export LS_COLORS='di=01;34:ln=01;35:so=01;32:ex=01;31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+    zstyle ':completion:*' list-colors 'di=;34;1' 'ln=;35;1' 'so=;32;1' 'ex=31;1' 'bd=46;34' 'cd=43;34'
+    ;;
+jfbterm-color)
+    #export LSCOLORS=gxFxCxdxBxegedabagacad
+    #export LS_COLORS='di=01;36:ln=01;35:so=01;32:ex=01;31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+    zstyle ':completion:*' list-colors 'di=;36;1' 'ln=;35;1' 'so=;32;1' 'ex=31;1' 'bd=46;34' 'cd=43;34'
+    ;;
+esac
+
+# set terminal title including current directory
+#
+case "${TERM}" in
+xterm|xterm-color|kterm|kterm-color)
+    precmd() {
+        echo -ne "\033]0;${USER}@${HOST%%.*}:${PWD}\007"
+    }
+    ;;
+esac
+
 # }}}
 ## Alias configuration {{{
 # expand aliases before completing
@@ -437,8 +713,19 @@ alias mv='mv -i'       # no spelling correction on mv
 alias cp='cp -i'       # no spelling correction on cp
 alias rm='rm -i'       # no spelling correction on rm
 
+alias -g @P='| fzfcut'
+
 alias projectlocal="vi -c 'silent call MakeProjectFileForProjectlocal() | quit'"
 alias pvi='vi -c "set paste"'
+
+case "$(uname -s)" in
+  Darwin)
+    alias fcd='cd `fcd.sh`'
+  ;;
+  Linux)
+    # なし
+  ;;
+esac
 
 delBackupFiles() {
   local recursive=false
@@ -484,6 +771,8 @@ delMacMetadata() {
     echo "キャンセルしました"
   fi
 }
+
+alias mu='echo 1>&2 "1又は複数のURLを含む文字列をペーストして<C-d>を入力してください。全てのURLをデフォルトブラウザで開きます。" ; cat | multiple_url_opener.rb'
 
 alias cdp='cdf .projectfile'
 

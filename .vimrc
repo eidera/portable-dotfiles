@@ -295,6 +295,13 @@ function! CdProjectRoot()
 endfunction
 nnoremap ,cdp :<C-U>call CdProjectRoot()<CR>
 " }}}
+" MultipleUrlOpener {{{
+vnoremap <C-W><C-U> :<C-U>'<,'>!multiple_url_opener.rb<CR>u
+" }}}
+" SearchAcross {{{
+vnoremap <C-W><C-D> "vy:<C-u>!multiple_searcher.rb -d <C-r>v<CR><CR>
+vnoremap <C-W><C-W><C-W> "vy:<C-u>!multiple_searcher.rb -a <C-r>v<CR><CR>
+" }}}
 " terminal modeの設定{{{
 tmap <C-W>[ <C-W>N " terminal-normalモードへの移行キーをscreenぽいキーバインドを追加
 
@@ -374,6 +381,9 @@ nnoremap ,,b :call ToggleBreakIndent()<CR>
 set nrformats-=octal
 " Kでvimのヘルプを検索するようにする。mac,linuxのデフォルトは「man -s」。詳細は「help K」で。
 set keywordprg=:help
+
+" パスワード生成スクリプトの実行
+command! -nargs=0 MakePasswd :r!make_passwd.rb -s
 
 augroup MyEtcAuGroup
   autocmd!
@@ -493,6 +503,8 @@ Plug 'Shougo/vimproc.vim', { 'tag': 'ver.10.0', 'do': 'make' }
 
 Plug 'vim-jp/vimdoc-ja', {'commit': 'ee16ecb8f802287302ff0317e52e27c274c16194' }
 Plug 'altercation/vim-colors-solarized', {'commit': '528a59f26d12278698bb946f8fb82a63711eec21' }
+Plug 'fuenor/qfixhowm', {'commit': '14d0a3414f69b3a06ba3616bdd53ca4dbcfc6106' }
+Plug 'mattn/vim-sonictemplate', {'commit': '050450414ca69885df7c26936821d74678ff4904' }
 
 " Unite
 Plug 'Shougo/unite.vim', { 'commit': '0ccb3f7988d61a9a86525374be97360bd20db6bc' }
@@ -759,6 +771,9 @@ function! MakeProjectFileForProjectlocal()
 endfunction
 command! -nargs=0 MakeProjectFileForProjectlocal :call MakeProjectFileForProjectlocal()
 " }}}
+" unite bmの設定 {{{
+nnoremap <C-W><C-R>oo :<C-U>Unite bm/list<CR>
+" }}}
 " VimFiler.vimの設定 {{{
 nnoremap <silent> ,,f :<C-u>VimFilerBufferDir<CR>
 " }}}
@@ -895,5 +910,71 @@ augroup MyMarkdownAuGroup
   autocmd BufNewFile,BufRead *.{md,mdwn,mkd,mkdn,mark*} setlocal foldmethod=expr
 augroup END
 "let g:vim_markdown_initial_foldlevel=0
+" }}}
+" qfixhowm の設定 {{{
+let QFixHowm_Key      = '<C-c>' " default: g
+"let QFixHowm_Key           = 'g' " default: g
+let QFixHowm_QuickMemoFile = 'Qmem-00-0000-00-00-000000.md'
+let QFixHowm_FileType      = 'markdown'
+let QFixHowm_Title         = '#'
+
+"let howm_dir          = '~/textastic/howm'
+let howm_dir          = '~/howm'
+"let howm_filename     = 'drafts/%Y/%m/%Y-%m-%d-%H%M%S.md'
+let howm_filename     = 'drafts/%Y-%m-%d-%H%M%S.md'
+let howm_fileencoding = 'utf-8'
+let howm_fileformat   = 'unix'
+
+let QFixHowm_DiaryFile     = 'diary/%Y/%m/%Y-%m-%d-diary.md'
+"let QFixHowm_DiaryFile     = 'diary/%Y/%m/%Y-%m-%d-%a-diary.md' ← 曜日を入れたいが %a を入れてしまうと実行時の曜日になってしまうのでファイルの日付と合わず正しく認識されない
+
+let QFixHowm_ListReminderCacheTime = 0 " TODO一覧でキャッシュを利用しない
+let g:qfixmemo_use_addtime = 0 " ファイル保存時のタイムスタンプを自動挿入しない
+
+let g:QFixHowm_SwitchListActionLock = ['{ }', '{o}', '{x}'] " default: ['{ }', '{*}', '{-}']
+
+" QFixHowm のキーバインドが動作しなくなったときにリカバリーする
+function! RecoveryHowmKeybind()
+  nnoremap <buffer> <silent> <CR> :call QFixMemoUserModeCR()<CR>
+  call howm_schedule#Init()
+endfunction
+"nnoremap <C-c>,k :call RecoveryHowmKeybind()<CR>
+execute 'nnoremap ' . QFixHowm_Key . ',k :call RecoveryHowmKeybind()<CR>'
+
+function! InsertTitleForHowmDiary()
+    let title = substitute(expand('%:t:r'), '-diary$', '', '')
+    " 現在行の下に挿入
+    "call append(line('.'), title)
+    " 現在のカーソル位置に挿入
+    execute "normal! a" . title
+endfunction
+command! InsertTitleForHowmDiary call InsertTitleForHowmDiary()
+
+" マークダウンファイルでのTodoハイライト設定
+augroup markdown_todo
+  autocmd!
+  " `projectlocal.markdown.project` のようなfiletypeへの対応
+  autocmd FileType * if &filetype =~ 'markdown' | call s:SetupMarkdownTodoHighlights() | endif
+augroup END
+
+function! s:SetupMarkdownTodoHighlights()
+  " 一度syntaxを変更して手動で確かめたいときには以下をexで実行してから実施する
+  " syntax clear TodoPending TodoDone TodoCancelled
+
+  " 未着手    : { }
+  " 対応済    : {*} {o}
+  " キャンセル: {-} {x}
+  syntax match TodoPending /{\s*}.*$/
+  syntax match TodoDone /{[*o]}.*$/
+  syntax match TodoCancelled /{[-x]}.*$/
+
+  " ハイライトグループの定義
+  highlight TodoPending ctermfg=Black ctermbg=Yellow guifg=#FFD700 cterm=bold gui=bold
+  highlight TodoDone ctermfg=LightGreen guifg=#505050 cterm=none gui=italic
+  highlight TodoCancelled ctermfg=LightYellow guifg=#505050 cterm=none gui=strikethrough
+endfunction
+" }}}
+" sonic template の設定 {{{
+let g:sonictemplate_vim_template_dir = expand('~/.vim/settings/sonictemplate/templates')
 " }}}
 " }}}
