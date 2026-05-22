@@ -1,0 +1,6 @@
+#!/bin/bash
+# xcopy-chomp: 末尾の改行を除去してクリップボードにコピー
+# Usage: echo "text" | xcopy-chomp
+#        xcopy-chomp < file.txt
+
+printf '%s' "$(cat)" | xcopy

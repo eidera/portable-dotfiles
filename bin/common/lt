@@ -1,0 +1,63 @@
+#! /usr/bin/env ruby
+
+#require 'pp'
+#require 'pry'
+
+require 'optparse'
+
+DEFAULT_FIND_TYPE_OPTION = '-type d -o -type f'
+DEFAULT_PROJECT_ROOT_FILE = '.projectfile'
+DEFAULT_IGNORE_DIRS = ['.git', 'vendor', 'node_modules', 'submodules']
+#DEFAULT_IGNORE_FILES = ['*~', '*.sw.?']
+
+def print_usage(io)
+  runner = File.basename($0)
+  $stderr.printf("Usage: #{runner} [options]\n")
+  $stderr.printf("  -h, --help : Show Help\n")
+  $stderr.printf("  -f : file only\n")
+  $stderr.printf("  -d : directory only\n")
+  $stderr.printf("  -a : file or directory\n")
+  $stderr.printf("  -p : start project root\n")
+end
+
+def search_project_root(project_root_file, original_depth, parents)
+  if File.exist?((parents + [project_root_file]).join('/'))
+    results = []
+    (original_depth - parents.length).times do
+      results << '..'
+    end
+    return results.join('/')
+  end
+
+  return nil if 1 == parents.length
+  search_project_root(project_root_file, original_depth, parents[0..-2])
+end
+
+params = ARGV.getopts('hfdap', 'help')
+
+if (params['h'] || params['help'])
+  print_usage($stderr)
+  exit 1
+end
+
+find_type_option = DEFAULT_FIND_TYPE_OPTION
+find_type_option = '-type f' if params['f']
+find_type_option = '-type d' if params['d']
+find_type_option = '-type d -o -type f' if params['a']
+
+project_root_file = ENV['LT_PROJECT_ROOT'] || DEFAULT_PROJECT_ROOT_FILE
+parents = Dir.pwd.split('/')
+path = params['p'] ? search_project_root(project_root_file, parents.length, parents) : '.'
+path = '.' if path.empty?
+
+find_options = []
+ignore_dirs = DEFAULT_IGNORE_DIRS
+ignore_dirs = ENV['LT_IGNORE_DIRS'].split(' ') if ENV['LT_IGNORE_DIRS']
+ignore_dirs.each do |ignore_dir|
+  find_options << sprintf("-type d -name '%s' -prune -o", ignore_dir)
+end
+find_options << find_type_option
+
+command = sprintf("find %s %s", path, find_options.join(' '))
+#$stderr.printf("%s\n", command)
+system(command)

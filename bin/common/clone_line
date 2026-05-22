@@ -1,0 +1,13 @@
+#! /usr/bin/env ruby
+
+DEFAULT_NUM = 2
+
+num = 0 == ARGV.length ? DEFAULT_NUM : num = ARGV[0].to_i
+
+lines = $stdin.readlines
+lines.each do |line|
+
+  num.times do |i|
+    printf("%s", line)
+  end
+end

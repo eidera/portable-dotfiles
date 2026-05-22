@@ -1,0 +1,128 @@
+#!/bin/bash
+
+# コマンド名を取得
+SCRIPT_NAME=$(basename "$0")
+
+# デフォルト値
+field=""
+display_fields=""
+delimiter=$'\t'
+no_clipboard=false
+
+# ヘルプ表示関数
+show_help() {
+  cat << EOF
+Usage: $SCRIPT_NAME [-h|--help] [-o field_number] [-d field_list] [-D delimiter] [--no-clipboard]
+
+Options:
+  -h, --help          Show this help message
+  -o field_number     Output field number (default: entire line)
+  -d field_list       Display only specified fields in fzf (e.g., 1,3)
+                      Specify field numbers in the original data, not display column numbers
+                      If omitted, all fields are displayed
+  -D delimiter        Field delimiter (default: tab)
+                      Example: -D ',' for CSV, -D ' ' for space-separated
+  --no-clipboard      Do not copy to clipboard, only output to stdout
+
+Examples:
+  $ cat sample.txt
+  YYYY-MM-DD	2025-11-06
+  YYYYMMDD	20251106
+  ISO8601 JST	2025-11-06T09:30:16+09:00
+  ISO8601 UTC	2025-11-06T00:30:16+00:00
+
+
+  $ cat sample.txt | $SCRIPT_NAME
+  $ cat sample.txt | $SCRIPT_NAME -o 2
+  $ cat sample.txt | $SCRIPT_NAME -d 2 -o 1
+  $ cat sample.txt | $SCRIPT_NAME -d 2
+  $ cat sample.txt | $SCRIPT_NAME --no-clipboard
+EOF
+}
+
+# 長いオプションの前処理
+args=()
+for arg in "$@"; do
+  if [[ "$arg" == "--help" ]]; then
+    show_help
+    exit 0
+  elif [[ "$arg" == "--no-clipboard" ]]; then
+    no_clipboard=true
+  else
+    args+=("$arg")
+  fi
+done
+
+# 処理済みの引数をセット
+set -- "${args[@]}"
+
+# オプション解析
+while getopts "ho:d:D:" opt; do
+  case $opt in
+    h)
+      show_help
+      exit 0
+      ;;
+    o)
+      field=$OPTARG
+      ;;
+    d)
+      display_fields=$OPTARG
+      ;;
+    D)
+      delimiter=$OPTARG
+      ;;
+    \?)
+      echo 1>&2 "Use -h or --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
+# 標準入力がパイプされているかチェック
+if [ -t 0 ]; then
+  echo 1>&2 "Error: No input provided. Please pipe data to this script."
+  echo 1>&2 "Use -h or --help for usage information"
+  echo 1>&2 ""
+  show_help
+  exit 1
+fi
+
+# 標準入力を変数に保存
+input=$(cat -)
+
+# デリミタがスペースの場合、連続した空白を1つのスペースに置き換える
+if [[ "$delimiter" == " " ]]; then
+  input=$(echo "$input" | awk '{$1=$1; print}' OFS=" ")
+fi
+
+line_count=$(echo "$input" | wc -l | tr -d ' ')
+
+# 1件の場合は自動選択、複数件の場合はfzfで選択
+if [[ $line_count -eq 1 ]]; then
+  # 1件のみ → fzfをスキップして自動選択
+  selected="$input"
+else
+  # 複数件 → fzfで選択
+  if [[ -n "$display_fields" ]]; then
+    # -d オプションが指定された場合、指定されたフィールドのみをfzfで表示
+    selected=$(echo "$input" | fzf --with-nth="$display_fields" --delimiter="$delimiter" --prompt="field-picker> ")
+  else
+    # -d オプションが省略された場合、全フィールドを表示
+    selected=$(echo "$input" | fzf --prompt="field-picker> ")
+  fi
+fi
+
+# -o オプションが指定されている場合はそのフィールドを切り出し、なければ行全体を使用
+if [[ -n "$field" ]]; then
+  result=$(echo "$selected" | cut -d "$delimiter" -f"$field")
+else
+  result=$(echo "$selected")
+fi
+
+# クリップボードへのコピー
+if [[ "$no_clipboard" == false ]]; then
+  echo "$result" | tr -d '\n' | pbcopy
+fi
+
+echo "$result"

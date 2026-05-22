@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+
+# ifp: interactive field-picker
+# Interactive command execution with field picker integration
+
+set -e
+
+# ヘルプ表示関数
+show_help() {
+  cat << 'EOF'
+ifp: interactive field-picker
+
+Usage: ifp [-h|--help] [-o field_number] [-d field_list] [-D delimiter] [--no-clipboard] -- command [args...]
+
+Description:
+  Interactive command execution with field picker integration.
+
+  Stage 1: Input query interactively and execute command in real-time
+  Stage 2: Select result using field-picker with fzf
+
+Options:
+  -h, --help          Show this help message
+  -o field_number     Output field number (passed to field-picker)
+  -d field_list       Display only specified fields in fzf (e.g., 1,3)
+  -D delimiter        Field delimiter (default: tab, passed to field-picker)
+                      Example: -D ',' for CSV, -D ' ' for space-separated
+  --no-clipboard      Do not copy to clipboard, only output to stdout
+
+Workflow:
+  1. Type query text character by character
+  2. Command executes in real-time with each character input
+  3. Results are displayed immediately (no filtering)
+  4a. Press Ctrl+Space on selected item → Apply field-picker options and exit
+  4b. Press Enter → Proceed to Stage 2 (field-picker selection)
+      - If only 1 result, auto-select it
+      - If multiple results, select with fzf
+
+Examples:
+  # Convert case and select
+  ifp -o 2 -- ruby case_converter.rb
+
+  # Search and select with field filtering
+  ifp -o 2 -d 1,3 -- grep -r "pattern"
+
+  # Without clipboard copy
+  ifp -o 2 --no-clipboard -- my-command
+
+EOF
+}
+
+# 引数解析
+field_picker_args=()
+command_parts=()
+parsing_command=false
+delimiter=$'\t'  # デフォルトはタブ
+next_is_delimiter=false
+
+for arg in "$@"; do
+  if [[ "$arg" == "--" ]]; then
+    parsing_command=true
+    continue
+  fi
+
+  if $parsing_command; then
+    command_parts+=("$arg")
+  else
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+      show_help
+      exit 0
+    fi
+
+    # -D オプションを検出してdelimiter変数に保存
+    if [[ "$next_is_delimiter" == true ]]; then
+      delimiter="$arg"
+      next_is_delimiter=false
+    elif [[ "$arg" == "-D" ]]; then
+      next_is_delimiter=true
+    fi
+
+    field_picker_args+=("$arg")
+  fi
+done
+
+# コマンドが指定されているかチェック
+if [[ ${#command_parts[@]} -eq 0 ]]; then
+  echo "Error: No command specified after --" >&2
+  echo "Use -h or --help for usage information" >&2
+  exit 1
+fi
+
+command="${command_parts[*]}"
+
+# output_field を取得（-o オプションの値）
+output_field=""
+skip_next=false
+for arg in "${field_picker_args[@]}"; do
+  if $skip_next; then
+    output_field="$arg"
+    skip_next=false
+    continue
+  fi
+  if [[ "$arg" == "-o" ]]; then
+    skip_next=true
+  fi
+done
+
+# プレビューコマンドを作成
+if [[ "$delimiter" == " " ]]; then
+  # スペース区切りの場合、連続した空白を1つのデリミタとして扱う（-F なし）
+  if [[ -n "$output_field" ]]; then
+    preview_cmd="echo {} | awk '{for(i=1;i<=NF;i++) {if(i==$output_field) print \"=> Field \" i \": \" \$i; else print \"   Field \" i \": \" \$i}}'"
+  else
+    preview_cmd="echo {} | awk '{for(i=1;i<=NF;i++) print \"Field \" i \": \" \$i}'"
+  fi
+else
+  # その他のデリミタ
+  if [[ -n "$output_field" ]]; then
+    preview_cmd="echo {} | awk -F'$delimiter' '{for(i=1;i<=NF;i++) {if(i==$output_field) print \"=> Field \" i \": \" \$i; else print \"   Field \" i \": \" \$i}}'"
+  else
+    preview_cmd="echo {} | awk -F'$delimiter' '{for(i=1;i<=NF;i++) print \"Field \" i \": \" \$i}'"
+  fi
+fi
+
+# fzfの存在チェック
+if ! command -v fzf &> /dev/null; then
+  echo "Error: fzf not found. Please install fzf." >&2
+  exit 1
+fi
+
+# 第一段階：fzfでリアルタイム実行
+echo "Stage 1: Interactive query input (Ctrl+Space: Select | Enter: Next Stage)" >&2
+
+# ヘッダーを2行で構築
+header_line1="Enter: All | Ctrl+Space: Current | Tab: Multi | Ctrl+O: Output (field ${output_field:-entire line}) | Ctrl+L: Layout"
+header_line2="Command: $command"
+header="$header_line1"$'\n'"$header_line2"
+
+output=$(echo "" | fzf \
+  --disabled \
+  --phony \
+  --multi \
+  --bind "start:reload($command 2>&1)" \
+  --bind 'change:reload:bash -c "test -n {q} && eval '"$command"' {q} || '"$command"'" 2>&1' \
+  --bind 'ctrl-l:change-preview-window(down:30%|right:30%)' \
+  --expect=enter,ctrl-space,ctrl-o \
+  --header "$header" \
+  --header-lines=0 \
+  --prompt="ifp> " \
+  --print-query \
+  --preview "$preview_cmd" \
+  --preview-window right:30%)
+
+# 出力を解析
+# 1行目：クエリ（--print-query）
+# 2行目：押されたキー（--expect）
+# 3行目以降：選択された項目（あれば）
+query=$(echo "$output" | sed -n '1p')
+key=$(echo "$output" | sed -n '2p')
+selected=$(echo "$output" | sed -n '3,$p')
+
+# クエリが空でも処理を続行（起動時の結果から選択可能）
+
+# キーによって処理を分岐
+if [[ "$key" == "ctrl-space" ]]; then
+  # Ctrl+Spaceで選択された → field-pickerへ
+
+  # 選択された項目がない場合、表示されている全てを取得
+  if [[ -z "$selected" ]]; then
+    echo "No selection detected, using all displayed items..." >&2
+    if [[ -n "$query" ]]; then
+      selected=$(bash -c "test -n {q} && eval $command {q} || $command" 2>&1)
+    else
+      selected=$(eval "$command" 2>&1)
+    fi
+  else
+    echo "Selected items detected, applying field-picker options..." >&2
+  fi
+
+  echo "$selected" | field-picker "${field_picker_args[@]}"
+  exit 0
+fi
+
+if [[ "$key" == "ctrl-o" ]]; then
+  # Ctrl+Oで出力フィールドを選択
+  echo "Select output fields (Tab to select multiple)..." >&2
+
+  # 選択された項目がない場合、表示されている全てを取得
+  if [[ -z "$selected" ]]; then
+    if [[ -n "$query" ]]; then
+      selected=$(bash -c "test -n {q} && eval $command {q} || $command" 2>&1)
+    else
+      selected=$(eval "$command" 2>&1)
+    fi
+  fi
+
+  # 選択された項目の最初の行からフィールドを抽出
+  first_line=$(echo "$selected" | head -1)
+
+  # awk を使って全フィールドをリスト化
+  if [[ "$delimiter" == " " ]]; then
+    # スペース区切りの場合、連続した空白を1つのデリミタとして扱う
+    field_list=$(echo "$first_line" | awk '{for(i=1;i<=NF;i++) print i ": " $i}')
+  else
+    field_list=$(echo "$first_line" | awk -F"$delimiter" '{for(i=1;i<=NF;i++) print i ": " $i}')
+  fi
+
+  # fzf で複数選択
+  chosen_fields=$(echo -n "$field_list" | fzf --multi --prompt="Output fields> " --with-nth=2.. --delimiter=": ")
+
+  if [[ -n "$chosen_fields" ]]; then
+    # 選択されたフィールド番号を抽出して、カンマ区切りにする
+    field_nums=$(echo "$chosen_fields" | cut -d: -f1 | paste -sd, -)
+
+    # field_picker_args から既存の -o を削除し、新しい -o を追加
+    new_args=()
+    skip_next=false
+    for arg in "${field_picker_args[@]}"; do
+      if $skip_next; then
+        skip_next=false
+        continue
+      fi
+      if [[ "$arg" == "-o" ]]; then
+        skip_next=true
+        continue
+      fi
+      new_args+=("$arg")
+    done
+    new_args+=("-o" "$field_nums")
+
+    echo "$selected" | field-picker "${new_args[@]}"
+  fi
+  exit 0
+fi
+
+# Enter または 選択なし → 第二段階へ
+
+# 第二段階：field-pickerで絞り込み
+echo "" >&2
+echo "Stage 2: Field picker selection" >&2
+
+if [[ -n "$query" ]]; then
+  result=$(eval "$command $query" 2>&1)
+else
+  result=$(eval "$command" 2>&1)
+fi
+echo "$result" | field-picker "${field_picker_args[@]}"

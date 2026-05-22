@@ -1,0 +1,6 @@
+#! /bin/bash
+
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_NAME=$(basename "$0")
+
+ruby "$SCRIPT_DIR"/modules_for_field_picker/table_plus.rb | field-picker --no-clipboard -d 1 -o 2 | xargs open

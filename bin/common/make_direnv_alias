@@ -1,0 +1,46 @@
+#! /bin/sh
+
+FILE=".envrc"
+
+cat << EOS >> $FILE
+
+clear_direnv_aliases
+
+#export DC_YMLS="-f docker-compose.yml -f docker-compose.override.yml -f docker-compose.binding.yml -f docker-compose.mylocal.yml"
+export DC_YMLS=""
+
+dc-logs () {
+    docker-compose \${DC_YMLS} logs -f "\$@"
+}
+export_function dc-logs
+
+dc-down () {
+    docker-compose \${DC_YMLS} down "\$@"
+}
+export_function dc-down
+
+dc-hard-down () {
+    dc-down -v --remove-orphans
+}
+export_function dc-hard-down
+
+dc-all-down () {
+    make all-clean
+}
+export_function dc-all-down
+
+dc-restart () {
+    dc-down && make && dc-logs
+}
+export_function dc-restart
+
+dc-hard-restart () {
+    dc-hard-down && make && make init && dc-logs
+}
+export_function dc-hard-restart
+
+dc-all-restart () {
+    dc-all-down && make && make init && dc-logs
+}
+export_function dc-all-restart
+EOS

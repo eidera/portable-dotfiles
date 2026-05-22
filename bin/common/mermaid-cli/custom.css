@@ -1,0 +1,17 @@
+/* Google Fontsなどのウェブフォントを使う */
+/* @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap'); */
+
+/*
+svg {
+  font-family: 'Noto Sans JP', sans-serif !important;
+}
+*/
+
+@font-face {
+  font-family: 'NotoSansJP';
+  src: url('/assets/NotoSansJP-Regular.ttf') format('truetype');
+}
+
+* {
+  font-family: 'NotoSansJP' !important;
+}

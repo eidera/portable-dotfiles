@@ -1,0 +1,4 @@
+#! /bin/bash
+
+SCRIPT_DIR=$(dirname $0)
+anode tsx "$SCRIPT_DIR"/modules_for_typescript/uuidgen-v7.ts "$@"

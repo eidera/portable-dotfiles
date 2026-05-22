@@ -1,0 +1,5 @@
+#! /bin/sh
+
+DOT_PATH='/usr/local/bin/dot'
+
+java -jar ~/bin/plantuml.jar -tpng -graphvizdot $DOT_PATH $@

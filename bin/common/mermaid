@@ -1,0 +1,88 @@
+#!/bin/bash
+
+show_help() {
+  cat <<'EOF'
+Usage: mermaid -i <input> -o <output> [options]
+
+Options:
+  -i <file>              Input file (required)
+  -o <file>              Output file (required)
+  --scale <number>       Scale factor (default: 3)
+  --assets-dir <path>    Assets directory containing custom.css and config.json
+                         (default: <script-dir>/mermaid-cli)
+  -h, --help             Show this help message
+
+Other options are passed through to mermaid-cli.
+EOF
+}
+
+SCALE=3
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ASSETS_DIR="$SCRIPT_DIR/mermaid-cli"
+INPUT=""
+OUTPUT=""
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    --scale)
+      SCALE="$2"
+      shift 2
+      ;;
+    --assets-dir)
+      ASSETS_DIR="$2"
+      shift 2
+      ;;
+    -i)
+      INPUT="$2"
+      shift 2
+      ;;
+    -o)
+      OUTPUT="$2"
+      shift 2
+      ;;
+    *)
+      EXTRA_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$INPUT" ]]; then
+  echo "Error: -i (input file) is required" >&2
+  exit 1
+fi
+
+if [[ -z "$OUTPUT" ]]; then
+  echo "Error: -o (output file) is required" >&2
+  exit 1
+fi
+
+DOCKER_ARGS=(
+  docker run --rm
+  -v "$PWD:/data"
+  -v "$ASSETS_DIR:/assets"
+  minlag/mermaid-cli
+  --scale "$SCALE"
+)
+
+if [[ -f "$ASSETS_DIR/custom.css" ]]; then
+  DOCKER_ARGS+=(-C /assets/custom.css)
+else
+  echo "Warning: $ASSETS_DIR/custom.css not found, skipping -C option" >&2
+fi
+
+if [[ -f "$ASSETS_DIR/config.json" ]]; then
+  DOCKER_ARGS+=(-c /assets/config.json)
+else
+  echo "Warning: $ASSETS_DIR/config.json not found, skipping -c option" >&2
+fi
+
+DOCKER_ARGS+=(-i "/data/$INPUT" -o "/data/$OUTPUT")
+DOCKER_ARGS+=("${EXTRA_ARGS[@]}")
+
+exec "${DOCKER_ARGS[@]}"

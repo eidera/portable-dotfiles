@@ -1,0 +1,6 @@
+#! /bin/bash
+
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_NAME=$(basename "$0")
+
+ifp -o 1 -- ruby "$SCRIPT_DIR"/modules_for_field_picker/time.rb "$*"

@@ -1,0 +1,6 @@
+#! /bin/bash
+
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_NAME=$(basename "$0")
+
+ifp -o 2 -- ruby "$SCRIPT_DIR"/modules_for_field_picker/case_converter.rb "$*"

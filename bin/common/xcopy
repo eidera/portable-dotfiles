@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "$(uname -s)" in
+  Darwin)
+    pbcopy
+    ;;
+  Linux)
+    if command -v wl-copy &>/dev/null; then
+      wl-copy
+    elif command -v xclip &>/dev/null; then
+      xclip -selection clipboard
+    elif command -v xsel &>/dev/null; then
+      xsel --clipboard
+    else
+      echo "Error: クリップボードコマンドが見つかりません。" >&2
+      echo "以下のいずれかをインストールしてください:" >&2
+      echo "  - wl-copy (wl-clipboard)" >&2
+      echo "  - xclip" >&2
+      echo "  - xsel" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Error: 未対応のOS ($(uname -s)) です。" >&2
+    exit 1
+    ;;
+esac

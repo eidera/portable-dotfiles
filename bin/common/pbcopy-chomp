@@ -1,0 +1,6 @@
+#!/bin/bash
+# pbcopy-chomp: 末尾の改行を除去してクリップボードにコピー
+# Usage: echo "text" | pbcopy-chomp
+#        pbcopy-chomp < file.txt
+
+printf '%s' "$(cat)" | pbcopy

@@ -1,0 +1,120 @@
+#!/bin/bash
+
+# video2mp4 - 動画ファイルをmp4形式に変換
+
+set -e
+
+# デフォルト値
+SCALE=1280
+OUTPUT=""
+INPUT=""
+
+# ヘルプ表示
+show_help() {
+    cat << EOF
+使い方: video2mp4 [オプション] 入力ファイル
+
+動画ファイルをmp4形式に変換します。
+
+オプション:
+  -s, --scale WIDTH    出力動画の横幅を指定 (デフォルト: 1280)
+  -o, --output FILE    出力ファイル名を指定 (デフォルト: 入力ファイル名.mp4)
+  -h, --help           このヘルプを表示
+
+例:
+  video2mp4 xxx.mov
+  video2mp4 zzz.mov -s 640
+  video2mp4 20260109_テスト.mov --scale 480
+  video2mp4 -s 640 -o output.mp4 input.mov
+
+EOF
+    exit 0
+}
+
+# 引数解析
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -s|--scale)
+            if [[ -z "$2" ]]; then
+                echo "エラー: -s/--scale オプションには数値を指定してください" >&2
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "エラー: scale値は正の整数である必要があります: $2" >&2
+                exit 1
+            fi
+            SCALE="$2"
+            shift 2
+            ;;
+        -o|--output)
+            if [[ -z "$2" ]]; then
+                echo "エラー: -o/--output オプションには出力ファイル名を指定してください" >&2
+                exit 1
+            fi
+            OUTPUT="$2"
+            shift 2
+            ;;
+        -*)
+            echo "エラー: 不明なオプション: $1" >&2
+            echo "ヘルプを表示するには -h または --help を使用してください" >&2
+            exit 1
+            ;;
+        *)
+            if [[ -z "$INPUT" ]]; then
+                INPUT="$1"
+            else
+                echo "エラー: 入力ファイルは1つのみ指定してください" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# 入力ファイルチェック
+if [[ -z "$INPUT" ]]; then
+    echo "エラー: 入力ファイルを指定してください" >&2
+    echo "ヘルプを表示するには -h または --help を使用してください" >&2
+    exit 1
+fi
+
+if [[ ! -f "$INPUT" ]]; then
+    echo "エラー: 入力ファイルが存在しません: $INPUT" >&2
+    exit 1
+fi
+
+# 入力ファイルの拡張子チェック（mp4は除外）
+INPUT_EXT="${INPUT##*.}"
+INPUT_EXT_LOWER=$(echo "$INPUT_EXT" | tr '[:upper:]' '[:lower:]')
+
+if [[ "$INPUT_EXT_LOWER" == "mp4" ]]; then
+    echo "エラー: 入力ファイルが既にmp4形式です: $INPUT" >&2
+    exit 1
+fi
+
+# 出力ファイル名の決定
+if [[ -z "$OUTPUT" ]]; then
+    OUTPUT="${INPUT%.*}.mp4"
+fi
+
+# 出力ファイルの上書き確認
+if [[ -f "$OUTPUT" ]]; then
+    echo -n "出力ファイル '$OUTPUT' が既に存在します。上書きしますか? (y/n): "
+    read -r CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[yY]$ ]]; then
+        echo "変換をキャンセルしました"
+        exit 0
+    fi
+fi
+
+# ffmpegコマンド実行
+echo "変換中: $INPUT -> $OUTPUT (scale=${SCALE})"
+if ffmpeg -i "$INPUT" -vcodec libx264 -acodec aac -vf "scale=${SCALE}:-2" -y "$OUTPUT"; then
+    echo "変換が完了しました: $OUTPUT"
+else
+    echo "エラー: ffmpegの実行に失敗しました" >&2
+    exit 1
+fi

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+####
+# インタラクティブシェルではない環境(Ex. Alfred, KeyboardMaestro, ...)でnodejs on miseのグローバルインストールされた環境を実行するツール
+# 
+# Preparation
+#   cp ~/bin/anode /usr/local/bin/.
+# 
+# Execution
+#   anode npm ls -g # <- `npm ls -g`
+#   anode node example.js
+#   anode tsx example.ts
+
+if [ -z "$1" ] ; then
+  echo 1>&2 "Usage: $0 {node related command} {argument...}"
+  exit 1
+fi
+
+export NODE_PATH=$(~/.local/bin/mise exec -- npm root -g)
+exec ~/.local/bin/mise exec -- "$@"

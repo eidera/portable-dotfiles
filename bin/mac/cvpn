@@ -1,0 +1,8 @@
+#! /bin/sh
+
+if [ -z "$VPN_NAME" ] ;then
+  echo "VPN_NAME is not defined" 1>&2
+  exit 1
+fi
+
+networksetup -connectpppoeservice "$VPN_NAME"

@@ -1,0 +1,18 @@
+#! /bin/bash
+
+stdin=$(cat -)
+selected=$(echo "$stdin" | fzf)
+
+fields=$(echo "$selected" | awk '{for(i=1;i<=NF;i++){c[NR,i]=$i}} NF>maxNf{maxNf=NF} END {for(j=1;j<=maxNf;j++){str=c[1,j];for(i=2;i<=NR;i++){str=str" "c[i,j]}print j": "gensub(/^(.{77}).*$/,"\\1...","g",str)}}')
+if [ -z "$fields" ] ; then
+  exit 0
+fi
+echo "$fields" 1>&2
+
+read -p "target field> " target_field < /dev/tty
+
+targets=$(echo "$selected" | awk -v "target=${target_field}" '{print $target}')
+# 複数選択したときは改行を空白に変換して1行に連結する
+copied=$(echo "$targets" | tr '\n' ' ' | sed -e 's/ $//')
+echo "$copied" | tr -d '\n' | pbcopy
+echo "$copied"

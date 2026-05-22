@@ -1,0 +1,437 @@
+#! /usr/bin/env ruby
+
+#require 'pp'
+#require 'pry'
+
+# class definition {{{
+## Exception definition {{{
+class InvalidCommandError < StandardError; end
+class InvalidArgumentError < StandardError; end
+class DuplicateError < StandardError; end
+class NoExistedError < StandardError; end
+## }}}
+## Command definition {{{
+class Command
+  KEY_INDEX = 'index'
+  KEY_PATH = 'path'
+
+  def initialize(config, name)
+    @config = config
+    @name = name
+  end
+
+  def execute(options)
+    raise 'Not implemented'
+  end
+
+  def get_command_details()
+    raise 'Not implemented'
+  end
+
+  def get_optional_description()
+    raise 'Not implemented'
+  end
+
+  def get_name()
+    @name
+  end
+
+  def target?(name)
+    (name == @name)
+  end
+
+  protected
+
+  def get_config()
+    @config
+  end
+end
+
+class ListCommand < Command
+  def initialize(config)
+    super(config, 'list')
+  end
+
+  def get_command_details()
+    ['show bookmarks']
+  end
+
+  def get_optional_description()
+    ''
+  end
+
+  def execute(_options)
+    values = get_config.list()
+    max_length = values.map{|x| x[0].length}.max
+    values.map do |value|
+      #sprintf("%-20s: %s", value[0], value[1][KEY_PATH])
+      sprintf("%s: %s", value[0].ljust(max_length+1), value[1][KEY_PATH])
+    end.join("\n")
+  end
+end
+
+class RegCommand < Command
+  def initialize(config)
+    super(config, 'reg')
+  end
+
+  def get_command_details()
+    results = []
+    results << 'register bookmark'
+    results << 'If identity is null identity will be the current directory name.'
+    results << 'If path is null path will be the current directory.'
+    results
+  end
+
+  def get_optional_description()
+    '[identity] [path]'
+  end
+
+  def execute(options)
+    #raise InvalidArgumentError.new('identity is required') if options.length < 1
+    identity = options[0] # identityはオプション
+    if identity.nil?
+      identity = Dir.pwd.split('/')[-1]
+    end
+
+    path = options[1] # pathはオプション
+    if path.nil?
+      path = Dir.pwd
+    else
+      path = File.expand_path(path)
+    end
+
+    get_config.register(identity, {KEY_PATH => path})
+    sprintf("%s is registered", identity)
+  end
+end
+
+class RmCommand < Command
+  def initialize(config)
+    super(config, 'rm')
+  end
+
+  def get_command_details()
+    ['remove bookmark']
+  end
+
+  def get_optional_description()
+    'identity'
+  end
+
+  def execute(options)
+    raise InvalidArgumentError.new('identity is required') if options.length < 1
+    identity = options[0]
+
+    raise NoExistedError.new(sprintf("%s is not existed", identity)) unless get_config.exist?(identity)
+
+    get_config.rm(identity)
+    get_config.index_refresh()
+    sprintf("%s is removed", identity)
+  end
+end
+
+class ShowCommand < Command
+  def initialize(config)
+    super(config, 'show')
+  end
+
+  def get_command_details()
+    ['show path']
+  end
+
+  def get_optional_description()
+    'identity'
+  end
+
+  def execute(options)
+    raise InvalidArgumentError.new('identity is required') if options.length < 1
+    identity = options[0]
+
+    raise NoExistedError.new(sprintf("%s is not existed", identity)) unless get_config.exist?(identity)
+    get_config.get(identity, KEY_PATH)
+  end
+end
+
+class RenameCommand < Command
+  def initialize(config)
+    super(config, 'mv')
+  end
+
+  def get_command_details()
+    results = []
+    results << 'rename identity'
+    results
+  end
+
+  def get_optional_description()
+    'old_identity new_identity'
+  end
+
+  def execute(options)
+    raise InvalidArgumentError.new('old_identity and new_identity are required') if options.length < 2
+    old_identity = options[0]
+    new_identity = options[1]
+
+    raise NoExistedError.new(sprintf("%s is not existed", old_identity)) unless get_config.exist?(old_identity)
+    show_command = ShowCommand.new(get_config)
+    path = show_command.execute([old_identity])
+
+    reg_command = RegCommand.new(get_config)
+    reg_command.execute([new_identity, path])
+
+    rm_command = RmCommand.new(get_config)
+    rm_command.execute([old_identity])
+
+    sprintf("Renamed %s to %s", old_identity, new_identity)
+  end
+end
+
+class RefreshCommand < Command
+  def initialize(config)
+    super(config, 'refresh')
+  end
+
+  def get_command_details()
+    results = []
+    results << 'refresh bookmark'
+    results
+  end
+
+  def get_optional_description()
+    ''
+  end
+
+  def execute(options)
+    get_config.index_refresh()
+    return
+  end
+end
+
+class CloneCommand < Command
+  def initialize(config)
+    super(config, 'clone')
+  end
+
+  def get_command_details()
+    results = []
+    results << 'git clone and register bookmark'
+    results << 'If identity is null identity will be git repository name'
+    results
+  end
+
+  def get_optional_description()
+    'git_url [identity]'
+  end
+
+  def execute(options)
+    raise InvalidArgumentError.new('giturl is required') if options.length < 1
+    giturl = options[0]
+    identity = options[1]
+
+    run = sprintf("git clone %s", giturl)
+    system(run)
+
+    basename = giturl.split('/')[-1].sub(/.git$/, '')
+    path = sprintf("%s/%s", Dir.pwd, basename)
+
+    if identity.nil?
+      identity = basename
+    end
+
+    reg_command = RegCommand.new(get_config)
+    reg_options = []
+    reg_options << identity
+    reg_options << path
+    reg_command.execute(reg_options)
+    sprintf("%s is cloned and registered", identity)
+  end
+end
+## }}}
+## Config {{{
+class Config
+  require 'fileutils'
+  require 'json'
+
+  INDEX_STEP = 10
+  DEFAULT_CONFIG_PATH = '~/.bm/config'
+  CONFIG_PATH = ENV['BM_CONFIG'] || DEFAULT_CONFIG_PATH
+
+  def initialize(key_index, path = CONFIG_PATH)
+    @key_index = key_index
+    @path = File.expand_path(path)
+    prepare()
+    @values = load_config()
+  end
+
+  attr_reader :key_index
+
+  def exist?(identity)
+    !(@values[identity].nil?)
+  end
+
+  def list()
+    @values.sort do |(k1, v1), (k2, v2)|
+      v1[key_index] <=> v2[key_index]
+    end.map do |v|
+      v[1].delete(key_index)
+      v
+    end
+  end
+
+  def get(identity, key = nil)
+    results = @values[identity]
+    return if results.nil?
+    return results if key.nil?
+    results[key]
+  end
+
+  def register(identity, infos)
+    raise DuplicateError.new(sprintf("%s is existed", identity)) if exist?(identity)
+    index = get_max_index
+    infos[key_index] = index.to_i + INDEX_STEP
+    @values[identity] = infos
+    save_config()
+  end
+
+  def rm(identity)
+    @values.delete(identity)
+    save_config()
+  end
+
+  def index_refresh()
+    @values.sort do |(k1, v1), (k2, v2)|
+      v1[key_index] <=> v2[key_index]
+    end.map.with_index do |v, index|
+      v[1][key_index] = (index + 1) * INDEX_STEP
+      [v[0], v[1]]
+    end
+    save_config()
+  end
+
+  protected
+
+  def prepare()
+    return if File.exist?(@path)
+
+    FileUtils.mkdir_p(File.dirname(@path))
+    #FileUtils.touch(@path)
+    open(@path, 'w') do |io|
+      io.printf('{}')
+    end
+  end
+
+  def load_config()
+    open(@path) do |io|
+      JSON.load(io)
+    end
+  end
+
+  def save_config()
+    open(@path, 'w') do |io|
+      #JSON.dump(@values, io)
+      io.write(JSON.pretty_generate(@values))
+    end
+  end
+
+  def get_max_index()
+    max = @values.sort do |(k1, v1), (k2, v2)|
+      v1[key_index] <=> v2[key_index]
+    end[-1]
+    return 0 if max.nil?
+    max[1][key_index]
+  end
+end
+## }}}
+## Executor {{{
+class Executor
+  CLASS_NAMES = ['ListCommand', 'RegCommand', 'RmCommand', 'ShowCommand', 'RenameCommand', 'RefreshCommand', 'CloneCommand']
+
+  def initialize(config)
+    @config = config
+    @commands = []
+    CLASS_NAMES.each do |class_name|
+      @commands << Kernel.const_get(class_name).new(@config)
+    end
+  end
+
+  def get_command_names()
+    get_command_names_and_details().map do |obj|
+      obj[:name]
+    end
+  end
+
+  def get_command_names_and_details()
+    @commands.map do |command|
+      { name: command.get_name,
+        option: command.get_optional_description,
+        details: command.get_command_details }
+    end
+  end
+
+  def execute(command_name, options)
+    message = target(command_name).execute(options)
+    return if message.nil?
+    printf("%s\n", message)
+  end
+
+  protected
+
+  def target(command_name)
+    @commands.each do |command|
+      return command if command.target?(command_name)
+    end
+    raise InvalidCommandError.new
+  end
+end
+## }}}
+# }}}
+
+def print_usage(io, executor, commands = nil)
+  runner = File.basename($0)
+  io.printf("Usage: %s (%s) [option]\n", runner, executor.get_command_names.join('|'))
+  executor.get_command_names_and_details.each do |obj|
+    if commands.nil? || commands.include?(obj[:name])
+      io.printf("  %s %s %s\n", runner, obj[:name], obj[:option])
+      io.printf("%s\n", obj[:details].map{ |x| '    ' + x }.join("\n"))
+    end
+  end
+end
+
+def print_error(io, executor, first_message, e, commands = nil)
+  io.printf("%s\n", first_message)
+  io.printf("%s\n", e.message) unless e.message.empty?
+  print_usage(io, executor, commands)
+end
+
+executor = Executor.new(Config.new(Command::KEY_INDEX))
+
+if ARGV.length < 1
+  print_usage($stderr, executor)
+  exit 1
+end
+
+command = ARGV[0]
+options = ARGV[1..-1]
+
+begin
+  executor.execute(command, options)
+rescue InvalidCommandError => e
+  message = sprintf("[ERROR] Unknown command: %s", command)
+  print_error($stderr, executor, message, e)
+  exit 1
+rescue InvalidArgumentError => e
+  message = sprintf("[ERROR] Invalid Argument: %s: %s", command, options.join(' '))
+  print_error($stderr, executor, message, e, [command])
+  exit 1
+rescue DuplicateError => e
+  message = sprintf("[ERROR] Duplicated : %s", command)
+  print_error($stderr, executor, message, e, [command])
+  exit 1
+rescue NoExistedError => e
+  message = sprintf("[ERROR] No existed : %s", command)
+  print_error($stderr, executor, message, e, [command])
+  exit 1
+end
+
+# vim: set ts=2 sw=2 ro fdm=marker:

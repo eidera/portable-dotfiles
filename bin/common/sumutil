@@ -1,0 +1,75 @@
+#! /usr/bin/env ruby
+
+class Values
+  def initialize()
+    @count = 0
+    @max = nil
+    @min = nil
+    @sum = 0
+  end
+
+  attr_reader :count
+
+  def push(value)
+    return if value.nil?
+
+    @count += 1
+    @sum += maybe_int(value)
+    @max = maybe_int(get_max(value))
+    @min = maybe_int(get_min(value))
+  end
+
+  def mean
+    maybe_int(@sum * 1.0 / @count)
+  end
+
+  def max
+    maybe_int(@max)
+  end
+
+  def min
+    maybe_int(@min)
+  end
+
+  def sum
+    maybe_int(@sum)
+  end
+
+  protected
+
+  def get_max(value)
+    return value if @max.nil?
+    @max < value ? value : @max
+  end
+
+  def get_min(value)
+    return value if @min.nil?
+    @min > value ? value : @min
+  end
+
+  # 可能でらえばFloatからIntegerに変換
+  def maybe_int(value)
+    value_i = value.to_i
+    value == value_i ? value_i : value
+  end
+end
+
+def collect()
+  values = Values.new
+
+  lines = $stdin.readlines
+  lines.each do |line|
+    line = line.chomp
+    next if line.empty?
+
+    values.push(line.to_f)
+  end
+  values
+end
+
+values = collect()
+printf("sum: %s\n", values.sum.to_s)
+printf("count: %s\n", values.count.to_s)
+printf("min: %s\n", values.min.to_s)
+printf("max: %s\n", values.max.to_s)
+printf("mean: %s\n", values.mean.to_s)
