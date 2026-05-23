@@ -1,8 +1,7 @@
 #! /bin/sh
 
 SCRIPT_DIR=$(dirname "$0")
-FLIST='.agignore .direnvrc .gitignore_global .gvimrc .hammerspoon .screenrc .vimrc .vim .zshrc'
-
+FLIST='.agignore .direnvrc .gitignore_global .gvimrc .hammerspoon .screenrc .vimrc .vim .zshrc .default-npm-packages'
 
 for file in $FLIST
 do
