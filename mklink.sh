@@ -8,3 +8,5 @@ do
 	echo "ln -s $SCRIPT_DIR/$file" 1>&2
 	ln -s $SCRIPT_DIR/$file
 done
+
+ln -s $DIR/bin/common ~/bin
