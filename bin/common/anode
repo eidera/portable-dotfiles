@@ -16,5 +16,17 @@ if [ -z "$1" ] ; then
   exit 1
 fi
 
-export NODE_PATH=$(~/.local/bin/mise exec -- npm root -g)
-exec ~/.local/bin/mise exec -- "$@"
+MISE_SEARCH_PATHS=("$HOME/.local/bin/mise" "/opt/homebrew/bin/mise")
+
+MISE=""
+for p in "${MISE_SEARCH_PATHS[@]}"; do
+  [ -x "$p" ] && MISE="$p" && break
+done
+
+if [ -z "$MISE" ]; then
+  echo 1>&2 "mise not found"
+  exit 1
+fi
+
+export NODE_PATH=$("$MISE" exec -- npm root -g)
+exec "$MISE" exec -- "$@"
