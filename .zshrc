@@ -100,10 +100,10 @@ precmd() {
     if (( total_sec >= 3 )); then
       case "$(uname -s)" in
         Linux)
-          notify-send -t 5000 "${_cmd_name} " "DONE! ${total_sec} [sec]\nzsh on iTerm"
+          notify-send -t 5000 "${_cmd_name} " "DONE! ${total_sec} [sec]\nzsh on Terminal"
           ;;
         Darwin)
-          terminal-notifier -title "${_cmd_name} " -subtitle "DONE! ${total_sec} [sec]" -message "zsh on iTerm"
+          terminal-notifier -title "${_cmd_name} " -subtitle "DONE! ${total_sec} [sec]" -message "zsh on Terminal"
           ;;
       esac
     fi
