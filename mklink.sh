@@ -9,4 +9,4 @@ do
 	ln -s $SCRIPT_DIR/$file
 done
 
-ln -s $DIR/bin/common ~/bin
+ln -s $SCRIPT_DIR/bin/common ~/bin
