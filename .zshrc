@@ -82,6 +82,7 @@ zstyle ":vcs_info:git:*"   stagedstr         "C"
 # --- preexec / precmd ---
 preexec() {
   _cmd_start=$EPOCHREALTIME
+  _cmd_name="${1}"
 }
 
 precmd() {
@@ -94,10 +95,22 @@ precmd() {
     local m=$(( total_sec % 3600 / 60 ))
     local s=$(( total_sec % 60 ))
     _cmd_elapsed="${h}h-${m}m-${s}s-${ms}ms ${total_sec}s"
+
+    # 3秒以上かかったら通知
+    if (( total_sec >= 3 )); then
+      case "$(uname -s)" in
+        Linux)
+          notify-send -t 5000 "${_cmd_name} " "DONE! ${total_sec} [sec]\nzsh on iTerm"
+          ;;
+        Darwin)
+          terminal-notifier -title "${_cmd_name} " -subtitle "DONE! ${total_sec} [sec]" -message "zsh on iTerm"
+          ;;
+      esac
+    fi
   else
     _cmd_elapsed=""
   fi
-  unset _cmd_start
+  unset _cmd_start _cmd_name
 
   # git情報をキャッシュ
   vcs_info
@@ -126,6 +139,13 @@ precmd() {
   else
     _git_info=" ${vcs_base}${extras}%f"
   fi
+
+  # 端末タイトルを設定
+  case "${TERM}" in
+    xterm|xterm-color|xterm-256color|kterm|kterm-color)
+      echo -ne "\033]0;${USER}@${HOST%%.*}:${PWD}\007"
+      ;;
+  esac
 }
 
 # --- プロンプト設定 ---
@@ -388,35 +408,6 @@ cdf() {
 
 # 長い処理時間がかかった場合に通知センター又はgrowlに通知する(3秒)
 
-local COMMAND=""
-local COMMAND_TIME=""
-local PREVIOUS_COMMAND_TIME=""
-precmd() {
-  if [ "$COMMAND_TIME" -ne "0" ] ; then
-    local d=`date +%s`
-    d=`expr $d - $COMMAND_TIME`
-    if [ "$d" -ge "3" ] ; then
-      COMMAND="$COMMAND "
-      case "$(uname -s)" in
-        Linux) # linux
-          notify-send -t 5000 "$COMMAND" "DONE! $d [sec]\nzsh on iTerm"
-        ;;
-      esac
-      case "$(uname -s)" in
-        Darwin) # mac
-          terminal-notifier -title "$COMMAND" -subtitle "DONE! $d [sec]" -message "zsh on iTerm"
-        ;;
-      esac
-    fi
-  fi
-  COMMAND="0"
-  COMMAND_TIME="0"
-}
-preexec () {
-  COMMAND="${1}"
-  COMMAND_TIME=`date +%s`
-  PREVIOUS_COMMAND_TIME="${COMMAND_TIME}"
-}
 # }}}
 # }}}
 ## Extension setting {{{
@@ -663,16 +654,6 @@ jfbterm-color)
     #export LSCOLORS=gxFxCxdxBxegedabagacad
     #export LS_COLORS='di=01;36:ln=01;35:so=01;32:ex=01;31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
     zstyle ':completion:*' list-colors 'di=;36;1' 'ln=;35;1' 'so=;32;1' 'ex=31;1' 'bd=46;34' 'cd=43;34'
-    ;;
-esac
-
-# set terminal title including current directory
-#
-case "${TERM}" in
-xterm|xterm-color|kterm|kterm-color)
-    precmd() {
-        echo -ne "\033]0;${USER}@${HOST%%.*}:${PWD}\007"
-    }
     ;;
 esac
 
