@@ -159,11 +159,22 @@ nnoremap <expr> gp '`[' . strpart(getregtype(), 0, 1) . '`]'
 " }}}
 "" PATHの設定 {{{
 if has("mac") || has("unix")
-  " ~/binとカレントディレクトリをMY_PATHに設定
-  let MY_PATH=$HOME."/bin:."
-  " asdf の パスもMY_PATHに設定
-  let MY_PATH=MY_PATH.":".$HOME."/.asdf/shims:"
-  let $PATH=$PATH."/bin:/usr/bin:/usr/local/bin:/opt/homebrew/bin:/sbin:/usr/sbin".":".MY_PATH
+  let s:extra_paths = [
+    \ $HOME . '/bin',
+    \ $HOME . '/bin/mac',
+    \ $HOME . '/bin/ubuntu',
+    \ $HOME . '/bin/personal',
+    \ $HOME . '/.local/share/mise/shims',
+    \ $HOME . '/.local/bin',
+    \ '/usr/local/bin',
+    \ '/usr/local/mysql/bin',
+    \ '/opt/X11/bin',
+    \ '/opt/local/bin',
+    \ '/opt/homebrew/bin',
+    \ '/sbin',
+    \ '/usr/sbin',
+    \ ]
+  let $PATH = join(s:extra_paths, ':') . ':' . $PATH
 endif
 "" }}}
 " gui用runtimepathの追加 {{{
