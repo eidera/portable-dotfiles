@@ -199,7 +199,7 @@ command! -nargs=0 -range=% SplitLineJpPunctuation :call SplitLineCharacter("、�
 command! -nargs=0 -range=% SplitLineEnPunctuation :call SplitLineCharacter("，．", <line1>, <line2>)
 
 function! SplitLineCharacter(chars, start, end)
-	let run = printf("%d",a:start) . "," . printf("%d",a:end) . "s/[" . a:chars . "]/&/g"
+	let run = printf('%d,%ds/[%s]/&\r/g', a:start, a:end, a:chars)
 	execute run
 endfunction
 " }}}
