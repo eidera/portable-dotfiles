@@ -410,7 +410,7 @@ cdf() {
 
 # }}}
 # }}}
-## Extension setting {{{
+# Editor setting {{{
 case "$(uname -s)" in
   Linux) # linux
     export EDITOR="/usr/bin/vi"
@@ -421,7 +421,7 @@ case "$(uname -s)" in
     export EDITOR="/usr/local/bin/vi"
   ;;
 esac
-
+# }}}
 # fzf {{{
 ## C-Rの履歴をfzfで選択 {{{
 function fzf-select-history() {
@@ -658,14 +658,14 @@ jfbterm-color)
 esac
 
 # }}}
-## Alias configuration {{{
+# Alias configuration {{{
 # expand aliases before completing
 setopt complete_aliases     # aliased ls needs if file/dir completions work
 
 alias szshrc="source ~/.zshrc"
 alias where="command -v"
 
-# ls関連 {{{
+## ls関連 {{{
 case "${OSTYPE}" in
 freebsd*|darwin*)
     alias ls="ls -F"
@@ -683,7 +683,7 @@ alias lad='la | grep / ; ls | grep @'
 alias lsf='ls | grep -v /'
 alias laf='la | grep -v /'
 alias llo="ll -O"
-# }}}
+## }}}
 
 alias du="du -h"
 alias df="df -h"
@@ -757,7 +757,22 @@ alias mu='echo 1>&2 "1又は複数のURLを含む文字列をペーストして<
 
 alias cdp='cdf .projectfile'
 
-# Mac用 {{{
+## docker {{{
+# dockerを利用したalias
+if command -v docker &>/dev/null; then
+  alias swagger='docker run --rm --name swagger-editor-v5 -p 8088:80 docker.swagger.io/swaggerapi/swagger-editor:next-v5'
+fi
+## }}}
+## linux {{{
+case "$(uname -s)" in
+  Linux) # linux
+    alias pbcopy='xclip -selection clipboard'
+    alias bat='batcat'
+    alias webstorm="~/.local/share/JetBrains/Toolbox/apps/webstorm/bin/webstorm.sh"
+  ;;
+esac
+## }}}
+## Mac用 {{{
 case "$(uname -s)" in
   Darwin) # mac
     #alias vi='vi -c "set bg=light"'		# for Solarized on iTerm2
@@ -767,9 +782,9 @@ case "$(uname -s)" in
     alias yoink='open -a Yoink'
   ;;
 esac
+## }}}
 # }}}
-
-## other settings {{{
+# other settings {{{
 eval "$(direnv hook zsh)"
 
 if [ -e ~/.local/bin/mise ] ; then
@@ -777,9 +792,9 @@ if [ -e ~/.local/bin/mise ] ; then
 fi
 
 export FZF_DEFAULT_OPTS='--reverse --multi --cycle --tiebreak=index --bind=ctrl-a:toggle-all'
-## }}}
 
 # 各環境用の設定相違点の吸収用
 if [ -e ~/.zsh_local/local.zshrc ] ; then
   source ~/.zsh_local/local.zshrc
 fi
+# }}}
