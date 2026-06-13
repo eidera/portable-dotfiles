@@ -22,7 +22,7 @@ on run
 		-- * Finder window is in search mode i.e current view is group view
 		-- * trash window is selected
 		-- * network is selected
-		-- a_location will be in valid value  ufolder ""v
+		-- a_location will be in valid value  ï¿½ufolder ""ï¿½v
 		set a_location to process_for_special_items()
 		if a_location is missing value then
 			error "Can't resolve selected location in Finder" number -128
@@ -126,5 +126,5 @@ EOS`
 then
 	echo "cd \"$targetDir\"" 1>&2
 	cd "$targetDir"
-	echo $PWD
+	echo "$PWD"
 fi

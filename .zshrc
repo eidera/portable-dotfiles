@@ -701,7 +701,7 @@ alias pvi='vi -c "set paste"'
 
 case "$(uname -s)" in
   Darwin)
-    alias fcd='cd `fcd.sh`'
+    alias fcd='cd "$(fcd.sh)"'
   ;;
   Linux)
     # なし
