@@ -709,6 +709,7 @@ case "$(uname -s)" in
 esac
 
 delBackupFiles() {
+  setopt local_options glob_dots
   local recursive=false
   local target_dir="."
 
