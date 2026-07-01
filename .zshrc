@@ -779,8 +779,8 @@ case "$(uname -s)" in
     #alias vi='vi -c "set bg=light"'		# for Solarized on iTerm2
     alias vi='/Applications/MacVim.app/Contents/MacOS/Vim -c "set bg=light"'
     alias gvim='/Applications/MacVim.app/Contents/bin/mvim --remote-tab'
+    alias vestibulet='/Applications/Vestibulet.app/Contents/MacOS/Vestibulet'
     alias gitx="open -a gitx"
-    alias yoink='open -a Yoink'
   ;;
 esac
 ## }}}
