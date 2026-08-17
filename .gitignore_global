@@ -10,6 +10,7 @@ docker-compose.mylocal.yml
 .claude
 .mcp.json
 mise.local.toml
+AGENTS.md
 
 # Mac {{{
 .DS_Store
