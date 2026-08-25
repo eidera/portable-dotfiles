@@ -1,0 +1,196 @@
+#compdef vestibulet
+
+_vestibulet() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        copy-link)
+          _vestibulet_copy_link
+          ;;
+        export)
+          _vestibulet_export
+          ;;
+        bookmark)
+          _vestibulet_bookmark
+          ;;
+        item)
+          _vestibulet_item
+          ;;
+        shelf)
+          _vestibulet_shelf
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_commands() {
+  local -a commands
+  commands=(
+    'smoke:動作確認（スモークテスト）'
+    'copy-link:リンクをコピー形式に変換 --input <link>'
+    'export:ライブラリを書き出し --destination <path>'
+    'bookmark:ブックマーク一覧・関連項目の取得'
+    'item:ライブラリ項目の一覧'
+    'shelf:一時棚への投入・一覧'
+    'help:ヘルプを表示'
+    '--version:バージョンを表示'
+    'panic:パニック（診断用）'
+  )
+  _describe 'command' commands
+}
+
+_vestibulet_formats() {
+  local -a formats
+  formats=(jsonl tsv)
+  _describe 'format' formats
+}
+
+_vestibulet_types() {
+  local -a types
+  types=(auto file text)
+  _describe 'type' types
+}
+
+_vestibulet_copy_link() {
+  _arguments \
+    '--input[変換するリンク]:link:'
+}
+
+_vestibulet_export() {
+  _arguments \
+    '--destination[書き出し先パス]:path:_files'
+}
+
+_vestibulet_bookmark() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_bookmark_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        list)
+          _vestibulet_bookmark_list
+          ;;
+        related)
+          _vestibulet_bookmark_related
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_bookmark_commands() {
+  local -a commands
+  commands=(
+    'list:ブックマーク一覧'
+    'related:指定 ID の関連項目'
+  )
+  _describe 'bookmark command' commands
+}
+
+_vestibulet_bookmark_list() {
+  _arguments \
+    '--format[出力形式]:format:_vestibulet_formats' \
+    '--library[ライブラリパス上書き]:path:_files'
+}
+
+_vestibulet_bookmark_related() {
+  _arguments \
+    '--id[対象ブックマークの UUID]:uuid:' \
+    '--format[出力形式]:format:_vestibulet_formats' \
+    '--library[ライブラリパス上書き]:path:_files'
+}
+
+_vestibulet_item() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_item_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        list)
+          _vestibulet_item_list
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_item_commands() {
+  local -a commands
+  commands=(
+    'list:ライブラリ項目一覧'
+  )
+  _describe 'item command' commands
+}
+
+_vestibulet_item_list() {
+  _arguments \
+    '--format[出力形式]:format:_vestibulet_formats' \
+    '--library[ライブラリパス上書き]:path:_files'
+}
+
+_vestibulet_shelf() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_shelf_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        add)
+          _vestibulet_shelf_add
+          ;;
+        list)
+          _vestibulet_shelf_list
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_shelf_commands() {
+  local -a commands
+  commands=(
+    'add:一時棚へ投入'
+    'list:一時棚の一覧'
+  )
+  _describe 'shelf command' commands
+}
+
+_vestibulet_shelf_add() {
+  _arguments \
+    '--type[入力種別]:type:_vestibulet_types' \
+    '--group[複数入力をグループ化して投入]' \
+    '--stdin[標準入力から読み込む]' \
+    '--format[出力形式]:format:_vestibulet_formats' \
+    '--inbox[インボックスパス上書き]:path:_files -/' \
+    '*:input:_files'
+}
+
+_vestibulet_shelf_list() {
+  _arguments \
+    '--format[出力形式]:format:_vestibulet_formats' \
+    '--shelf[棚状態ファイルパス上書き]:path:_files'
+}
+
+_vestibulet "$@"

@@ -1,0 +1,55 @@
+#compdef bm
+
+_bm() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_bm_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        rm|show)
+          _bm_identities
+          ;;
+        mv)
+          _bm_identities
+          ;;
+        reg)
+          case $CURRENT in
+            3)
+              _directories
+              ;;
+          esac
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_bm_commands() {
+  local -a commands
+  commands=(
+    'list:ブックマーク一覧を表示'
+    'reg:ブックマークを登録 [identity] [path]'
+    'rm:ブックマークを削除 identity'
+    'show:パスを表示 identity'
+    'mv:ブックマーク名を変更 old_identity new_identity'
+    'refresh:インデックスを再構築'
+    'clone:git cloneしてブックマーク登録 git_url [identity]'
+  )
+  _describe 'command' commands
+}
+
+_bm_identities() {
+  local config_path="${BM_CONFIG:-$HOME/.bm/config}"
+  local -a identities
+  if [[ -f "$config_path" ]]; then
+    identities=(${(f)"$(ruby -rjson -e 'puts JSON.load(File.read(ARGV[0])).keys.join("\n")' "$config_path" 2>/dev/null)"})
+    _describe 'bookmark' identities
+  fi
+}
+
+_bm "$@"

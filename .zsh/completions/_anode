@@ -1,0 +1,24 @@
+#compdef anode
+
+_anode() {
+  local -a node_cmds
+  node_cmds=(
+    'node:Node.js REPL / スクリプト実行'
+    'npm:Node.js パッケージマネージャ'
+    'npx:npmパッケージの実行'
+    'tsx:TypeScript実行'
+    'corepack:Node.js パッケージマネージャ管理'
+  )
+
+  if (( CURRENT == 2 )); then
+    _describe 'node command' node_cmds
+  else
+    # サブコマンドの補完にデリゲート (例: npm, node の既存補完を使用)
+    local cmd=$words[2]
+    words=("$cmd" "${words[@]:2}")
+    (( CURRENT-- ))
+    _normal
+  fi
+}
+
+_anode "$@"
