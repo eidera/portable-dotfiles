@@ -20,7 +20,6 @@ function mainModal:entered()
                                        "r - HammerSpoonの設定をリロード\n" ..
                                        "v - MacVimを起動\n" ..
                                        "t - ターミナルを起動\n" ..
-                                       "g - GrabCueを起動\n" ..
                                        "l - ランチャーメニュー\n" ..
                                        "z - AIメニュー\n" ..
                                        "esc - 退出",
@@ -65,12 +64,6 @@ mainModal:bind('', 't', function()
     mainModal:exit()
 end)
 
--- g: GrabCueを起動し、メイン退出
-mainModal:bind('', 'g', function()
-    hs.application.launchOrFocus("GrabCue")
-    mainModal:exit()
-end)
-
 -- ランチャーサブメニューのモーダルを作成
 local launcherModal = hs.hotkey.modal.new()
 
@@ -79,6 +72,7 @@ function launcherModal:entered()
     local listText = hs.styledtext.new("ランチャーメニュー:\n" ..
                                        "w - 天気アプリを開く\n" ..
                                        "c - カレンダーを開く\n" ..
+                                       "g - GrabCueを起動\n" ..
                                        "esc - メインメニューに戻る",
                                        {font = {name = "Menlo", size = 14}, color = {white = 1.0}})
     hs.alert.show(listText, {}, hs.screen.mainScreen(), 'infinite')
@@ -111,6 +105,12 @@ end)
 launcherModal:bind('', 'c', function()
     launcherModal:exit()
     hs.application.launchOrFocus("Calendar")
+end)
+
+-- g: GrabCueを開く
+launcherModal:bind('', 'g', function()
+    launcherModal:exit()
+    hs.application.launchOrFocus("GrabCue")
 end)
 
 -- l: メインメニューからランチャーメニューへ遷移
