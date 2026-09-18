@@ -20,6 +20,7 @@ function mainModal:entered()
                                        "r - HammerSpoonの設定をリロード\n" ..
                                        "v - MacVimを起動\n" ..
                                        "t - ターミナルを起動\n" ..
+                                       "g - GrabCueを起動\n" ..
                                        "l - ランチャーメニュー\n" ..
                                        "z - AIメニュー\n" ..
                                        "esc - 退出",
@@ -61,6 +62,12 @@ end)
 -- t: ターミナルを起動し、メイン退出
 mainModal:bind('', 't', function()
     launchFirstAvailableApp({"iTerm", "Terminal"})
+    mainModal:exit()
+end)
+
+-- g: GrabCueを起動し、メイン退出
+mainModal:bind('', 'g', function()
+    hs.application.launchOrFocus("GrabCue")
     mainModal:exit()
 end)
 
