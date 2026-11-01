@@ -26,6 +26,12 @@ _vestibulet() {
         shelf)
           _vestibulet_shelf
           ;;
+        filer)
+          _vestibulet_filer
+          ;;
+        open-router)
+          _vestibulet_open_router
+          ;;
       esac
       ;;
   esac
@@ -40,7 +46,11 @@ _vestibulet_commands() {
     'bookmark:ブックマーク一覧・関連項目の取得'
     'item:ライブラリ項目の一覧'
     'shelf:一時棚への投入・一覧'
+    'filer:ファイラでディレクトリを開く'
+    'open-router:OpenRouter でファイルを開く（ルール／アプリ選択）'
     'help:ヘルプを表示'
+    '--help:ヘルプを表示'
+    '-h:ヘルプを表示'
     '--version:バージョンを表示'
     'panic:パニック（診断用）'
   )
@@ -191,6 +201,71 @@ _vestibulet_shelf_list() {
   _arguments \
     '--format[出力形式]:format:_vestibulet_formats' \
     '--shelf[棚状態ファイルパス上書き]:path:_files'
+}
+
+_vestibulet_filer() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_filer_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        open)
+          _vestibulet_filer_open
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_filer_commands() {
+  local -a commands
+  commands=(
+    'open:アクティブペインの新規タブでディレクトリを開く（省略時は cwd）'
+  )
+  _describe 'filer command' commands
+}
+
+_vestibulet_filer_open() {
+  _arguments \
+    '1:directory:_files -/'
+}
+
+_vestibulet_open_router() {
+  local context state state_descr line
+  typeset -A opt_args
+
+  _arguments -C \
+    '1: :_vestibulet_open_router_commands' \
+    '*::arg:->args'
+
+  case "$state" in
+    args)
+      case $words[1] in
+        route|ask)
+          _vestibulet_open_router_paths
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_vestibulet_open_router_commands() {
+  local -a commands
+  commands=(
+    'route:ルールで開く（不一致時は LS 既定）'
+    'ask:アプリ選択（chooser）で開く'
+  )
+  _describe 'open-router command' commands
+}
+
+_vestibulet_open_router_paths() {
+  _arguments \
+    '*:file:_files'
 }
 
 _vestibulet "$@"
