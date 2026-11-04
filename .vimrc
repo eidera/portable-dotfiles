@@ -959,6 +959,13 @@ let g:qfixmemo_use_addtime = 0 " ファイル保存時のタイムスタンプ�
 
 let g:QFixHowm_SwitchListActionLock = ['{ }', '{o}', '{x}'] " default: ['{ }', '{*}', '{-}']
 
+" howm_dir のディレクトリがない環境では qfixmemo を無効化する
+" (存在しないと IsQFixMemo() が howm_dir の親ディレクトリ配下の .md を全てメモと誤判定し、保存時にタイトル行が挿入される)
+" howm_dir 未設定時の既定値 ~/howm はプラグイン読み込み時(env-cnv.vim)に設定され、.vimrc の時点では参照できないため同値を指定する
+if !isdirectory(expand(get(g:, 'howm_dir', '~/howm')))
+  let g:disable_qfixmemo = 1
+endif
+
 " QFixHowm のキーバインドが動作しなくなったときにリカバリーする
 function! RecoveryHowmKeybind()
   nnoremap <buffer> <silent> <CR> :call QFixMemoUserModeCR()<CR>
