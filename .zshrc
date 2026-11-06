@@ -217,6 +217,8 @@ compinit
 ## zsh editor
 autoload zed
 
+zstyle ':completion:*:make:*:targets' call-command true
+
 ## Command Logger: 実行したコマンドとその結果をクリップボードにコピーしつつ、結果は標準出力にも表示する {{{
 function commandLogger() {
     # 実行時のコマンド名を取得
