@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/modules_for_shell/platform.sh"
+
 case "$(uname -s)" in
   Darwin)
     pbcopy
     ;;
   Linux)
-    if command -v wl-copy &>/dev/null; then
+    if is_termux; then
+      if command -v termux-clipboard-set &>/dev/null; then
+        termux-clipboard-set
+      else
+        echo "Error: termux-clipboard-set が見つかりません。" >&2
+        echo "以下を実施してください:" >&2
+        echo "  - pkg install termux-api" >&2
+        echo "  - Termux:API アプリのインストール" >&2
+        exit 1
+      fi
+    elif command -v wl-copy &>/dev/null; then
       wl-copy
     elif command -v xclip &>/dev/null; then
       xclip -selection clipboard

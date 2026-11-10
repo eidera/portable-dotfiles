@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# xpaste: クリップボードの内容を標準出力に出力する (xcopy の対)
+# Usage: xpaste
+#        xpaste > file.txt
+set -euo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/modules_for_shell/platform.sh"
+
+case "$(uname -s)" in
+  Darwin)
+    pbpaste
+    ;;
+  Linux)
+    if is_termux; then
+      if command -v termux-clipboard-get &>/dev/null; then
+        termux-clipboard-get
+      else
+        echo "Error: termux-clipboard-get が見つかりません。" >&2
+        echo "以下を実施してください:" >&2
+        echo "  - pkg install termux-api" >&2
+        echo "  - Termux:API アプリのインストール" >&2
+        exit 1
+      fi
+    elif command -v wl-paste &>/dev/null; then
+      wl-paste --no-newline
+    elif command -v xclip &>/dev/null; then
+      xclip -selection clipboard -o
+    elif command -v xsel &>/dev/null; then
+      xsel --clipboard --output
+    else
+      echo "Error: クリップボードコマンドが見つかりません。" >&2
+      echo "以下のいずれかをインストールしてください:" >&2
+      echo "  - wl-paste (wl-clipboard)" >&2
+      echo "  - xclip" >&2
+      echo "  - xsel" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Error: 未対応のOS ($(uname -s)) です。" >&2
+    exit 1
+    ;;
+esac

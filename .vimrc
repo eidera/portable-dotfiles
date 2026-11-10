@@ -425,6 +425,7 @@ augroup MyEtcAuGroup
 augroup END
 " }}}
 " for Termux {{{
+" 判定条件は bin/common/modules_for_shell/platform.sh の is_termux と揃えている
 let s:is_termux = exists('$TERMUX_VERSION')
       \ || $PREFIX =~# 'com\.termux'
       \ || isdirectory('/data/data/com.termux')
