@@ -111,10 +111,8 @@ bind -c resize k eval 'resize -1' 'command -c resize'
 bind -c resize h eval 'resize -1' 'command -c resize'
 #######################################################
 
-# でクリップボードにコピー＆ファイル削除(mac, linux, BSD全環境対応。最初の成功したクリップボードコピーコマンドで実行が終了する)
-#bind C eval 'writebuf /tmp/screen-clipboard' 'exec sh -c "{ pbcopy < /tmp/screen-clipboard || xsel -i -b < /tmp/screen-clipboard || xclip -selection clipboard < /tmp/screen-clipboard || wl-copy < /tmp/screen-clipboard; } && rm -f /tmp/screen-clipboard"'
-#bind C eval 'writebuf /tmp/screen-clipboard' 'exec sh -c "~/bin/xcopy < /tmp/screen-clipboard && rm -f /tmp/screen-clipboard"'
-bind C eval 'writebuf /tmp/screen-clipboard' 'exec !!! sh -c "~/bin/xcopy < /tmp/screen-clipboard && rm -f /tmp/screen-clipboard"'
+# Cでクリップボードにコピー＆ファイル削除(mac, linux, BSD全環境対応。最初の成功したクリップボードコピーコマンドで実行が終了する)
+bind C eval "writebuf $HOME/.screen-clipboard" 'exec !!! sh -c "~/bin/xcopy < $HOME/.screen-clipboard && rm -f $HOME/.screen-clipboard"'
 #  exec は現在のウィンドウのI/Oにコマンドを接続してしまうため、xcopy が正しくstdinを読めません。!!! を付けることでstdin/stdout/stderrをウィンドウから切り離せます：
 #    !!! の意味：
 #    - 1つ目の ! → stdinをウィンドウに接続しない
