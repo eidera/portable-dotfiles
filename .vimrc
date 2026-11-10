@@ -424,6 +424,11 @@ augroup MyEtcAuGroup
   autocmd QuickfixCmdPost make,grep,grepadd,vimgrep cw
 augroup END
 " }}}
+" for Termux {{{
+let s:is_termux = exists('$TERMUX_VERSION')
+      \ || $PREFIX =~# 'com\.termux'
+      \ || isdirectory('/data/data/com.termux')
+" }}}
 " }}}
 " filetype設定 {{{
 let g:plantuml_executable_script="plantuml"
@@ -556,6 +561,10 @@ Plug 'nikvdp/ejs-syntax', { 'commit': '0e704c523dacfda547215b5936067869e79103c4'
 Plug 'toyamarinyon/vim-swift', { 'commit': '85025c4af417b5462831935dd7c2d57e4a5559bd' }
 Plug 'slim-template/vim-slim', { 'commit': 'a0a57f75f20a03d5fa798484743e98f4af623926' }
 Plug 'kchmck/vim-coffee-script', { 'commit': '28421258a8dde5a50deafbfc19cd9873cacfaa79' }
+
+if s:is_termux
+  Plug 'vim-skk/eskk.vim', { 'commit': '131a290d5305b9bf06426cfe32065f97e23d471c' }
+endif
 
 call plug#end()
 
@@ -1009,5 +1018,12 @@ endfunction
 " }}}
 " sonic template の設定 {{{
 let g:sonictemplate_vim_template_dir = expand('~/.vim/settings/sonictemplate/templates')
+" }}}
+" eskk.vim の設定 {{{
+if s:is_termux
+  let g:eskk#directory = "~/.eskk"
+  let g:eskk#dictionary = { 'path': "~/.eskk-jisyo", 'sorted': 0, 'encoding': 'utf-8', }
+  let g:eskk#large_dictionary = { 'path': "~/.eskk/SKK-JISYO.L", 'sorted': 1, 'encoding': 'utf-8', }
+endif
 " }}}
 " }}}
