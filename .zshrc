@@ -52,13 +52,10 @@ case ${UID} in
       ;;
     esac
 
-    # 最後にカレントを入れる(全環境共通)
-    # ログインシェルまたは screen 環境では PATH を完全に定義
-    if [[ -o login ]] || [ "true" = "$SCREEN" ]; then
-      export PATH=${NEW_PATH}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:.
-    else
-      export PATH=${NEW_PATH}:${PATH}:.
-    fi
+    # 先頭の並びを固定しつつ、継承したPATHは後ろに残す(重複は typeset -U で除去)
+    # 継承分の "." は除去し、カレントは必ず末尾に置く(全環境共通)
+    path=(${path:#.})
+    export PATH=${NEW_PATH}:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}:.
     ;;
 esac
 
