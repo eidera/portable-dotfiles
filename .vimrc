@@ -428,6 +428,12 @@ augroup END
 let s:is_termux = exists('$TERMUX_VERSION')
       \ || $PREFIX =~# 'com\.termux'
       \ || isdirectory('/data/data/com.termux')
+
+if s:is_termux
+  " eskkの変換処理やstty、tput、echo などの端末に触る処理などで vim が suspend されないようにする
+  set shell=sh
+endif
+
 " }}}
 " }}}
 " filetype設定 {{{
