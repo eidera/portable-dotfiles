@@ -597,28 +597,26 @@ bindkey "^o^prd" fzf-open-project-under-directory
 # extended cd {{{
 # ref: https://qiita.com/arks22/items/8515a7f4eab37cfbfb17
 export EXTENDED_CD_HISTORY_PATH="$HOME/.extended_cd.log"
+export EXTENDED_CD_HISTORY_MAX=1000 # 保持する履歴の最大件数
 
 function chpwd() {
   extended_cd_add_log
 }
 
 function extended_cd_add_log() {
-  local i=0
-  cat "$EXTENDED_CD_HISTORY_PATH" | while read line; do
-    (( i++ ))
-    if [ i = 30 ]; then
-      sed -i -e "30,30d" "$EXTENDED_CD_HISTORY_PATH"
-    elif [ "$line" = "$PWD" ]; then
-      sed -i -e "${i},${i}d" "$EXTENDED_CD_HISTORY_PATH"
-    fi
-  done
-  echo "$PWD" >> "$EXTENDED_CD_HISTORY_PATH"
+  local -a dirs
+  dirs=(${(f)"$(<"$EXTENDED_CD_HISTORY_PATH")"})   # 1行ずつ配列に (空行は除外)
+  dirs=(${dirs:#$PWD} "$PWD")                      # 同じディレクトリを除いて末尾に追加 (GLOB_SUBST オフなので $PWD は文字列として比較される)
+  (( $#dirs > EXTENDED_CD_HISTORY_MAX )) && dirs=(${dirs[-EXTENDED_CD_HISTORY_MAX,-1]})   # 上限を超えた分だけ古いものを捨てる
+  print -rl -- $dirs >| "$EXTENDED_CD_HISTORY_PATH"
 }
 
 function extended_cd() {
   if [ $# = 0 ]; then
-    # 環境によってはgtacではなく `tac` や `tail -r`
-    cd "$(gtac "$EXTENDED_CD_HISTORY_PATH" | fzf)"
+    local dir
+    # (Oa) で配列を逆順にし、新しい順に表示する (tac / gtac / tail -r が不要)
+    dir="$(print -rl -- ${(Oa)${(f)"$(<"$EXTENDED_CD_HISTORY_PATH")"}} | fzf)"
+    [ -n "$dir" ] && cd "$dir"   # fzf を Esc で閉じたときは何もしない
   elif [ $# = 1 ]; then
     cd $1
   else
