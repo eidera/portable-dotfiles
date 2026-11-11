@@ -438,11 +438,25 @@ case "$(uname -s)" in
 esac
 # }}}
 # fzf {{{
-## C-Rの履歴をfzfで選択 {{{
+## C-Rの履歴をfzfで選択 (fzf 内で C-r を押すと 重複なし/重複あり を切り替え) {{{
 function fzf-select-history() {
-    BUFFER=$(fc -l -r -n 1 | fzf --prompt '[Command HISTORY] ')
+  local selected
+  # fc は zsh の組み込みコマンドなので、fzf の reload からは呼べない。
+  # そこで =(...) で一時ファイルに書き出し、無名関数の引数として渡す
+  # ($1: 重複あり, $2: 重複なし。一時ファイルは無名関数が終わると自動で削除される)
+  selected=$(() {
+    fzf --prompt '[Command HISTORY] ' --query "$LBUFFER" \
+        --header 'C-r: 重複なし / 重複あり 切替' \
+        --bind "ctrl-r:transform:[[ \$FZF_PROMPT == *ALL* ]] \
+                && echo 'change-prompt([Command HISTORY] )+reload(cat $2)' \
+                || echo 'change-prompt([Command HISTORY ALL] )+reload(cat $1)'" \
+        < $2
+  } =(fc -l -r -n 1) =(fc -l -r -n 1 | awk '!seen[$0]++'))
+  if [[ -n $selected ]]; then
+    BUFFER=$selected
     CURSOR=$#BUFFER
-    zle redisplay
+  fi
+  zle redisplay
 }
 
 zle -N fzf-select-history
