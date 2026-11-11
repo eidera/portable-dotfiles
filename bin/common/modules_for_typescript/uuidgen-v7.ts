@@ -1,4 +1,4 @@
-#! /usr/bin/env anode ts-node
+#!/usr/bin/env -S anode tsx
 
 // Prepareation
 //   npm install -g uuidv7

@@ -2,7 +2,8 @@
 
 ####
 # インタラクティブシェルではない環境(Ex. Alfred, KeyboardMaestro, ...)でnodejs on miseのグローバルインストールされた環境を実行するツール
-# 
+# miseが見つからない環境では、PATH上の素のnodejsを利用する
+#
 # Preparation
 #   cp ~/bin/anode /usr/local/bin/.
 # 
@@ -23,10 +24,19 @@ for p in "${MISE_SEARCH_PATHS[@]}"; do
   [ -x "$p" ] && MISE="$p" && break
 done
 
-if [ -z "$MISE" ]; then
-  echo 1>&2 "mise not found"
+if [ -n "$MISE" ]; then
+  RUNNER=("$MISE" exec --)
+elif command -v node >/dev/null 2>&1; then
+  # mise がない環境では、PATH 上の素の node を使う
+  RUNNER=()
+else
+  echo 1>&2 "mise も node も見つかりません"
   exit 1
 fi
 
-export NODE_PATH=$("$MISE" exec -- npm root -g)
-exec "$MISE" exec -- "$@"
+# npm がない環境もあるため、取得できたときだけ設定する
+if NPM_ROOT=$("${RUNNER[@]}" npm root -g 2>/dev/null); then
+  export NODE_PATH="$NPM_ROOT"
+fi
+
+exec "${RUNNER[@]}" "$@"
