@@ -7,6 +7,15 @@ setopt IGNORE_EOF # ^Dでログアウトしないようにする
 # bindkey -vの時にESCの反応が遅い対応
 KEYTIMEOUT=1 # defaultは40[msec]
 # }}}
+## Platform {{{
+# Termux 環境なら 0 を返す
+# 判定条件は bin/common/modules_for_shell/platform.sh と .vimrc の s:is_termux と揃えている
+is_termux() {
+  [[ -n "${TERMUX_VERSION:-}" ]] \
+    || [[ "${PREFIX:-}" == *com.termux* ]] \
+    || [[ -d /data/data/com.termux ]]
+}
+# }}}
 ## Environment variable configuration {{{
 export LANG=ja_JP.UTF-8
 case ${UID} in
@@ -97,7 +106,14 @@ precmd() {
     if (( total_sec >= 3 )); then
       case "$(uname -s)" in
         Linux)
-          notify-send -t 5000 "${_cmd_name} " "DONE! ${total_sec} [sec]\nzsh on Terminal"
+          if is_termux; then
+            # Termux には D-Bus がないため、notify-send ではなく Android の通知を使う
+            if (( $+commands[termux-notification] )); then
+              termux-notification --id zsh-cmd-done --title "${_cmd_name} " --content "DONE! ${total_sec} [sec]" &!
+            fi
+          elif (( $+commands[notify-send] )); then
+            notify-send -t 5000 "${_cmd_name} " "DONE! ${total_sec} [sec]\nzsh on Terminal"
+          fi
           ;;
         Darwin)
           terminal-notifier -title "${_cmd_name} " -subtitle "DONE! ${total_sec} [sec]" -message "zsh on Terminal"
