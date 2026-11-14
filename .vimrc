@@ -339,20 +339,41 @@ nnoremap ,vs :<C-U>terminal<CR>
 " }}}
 " 開いているファイルをVSCodeなどいくつかのアプリケーションをfzfで選択的に開く {{{
 if has("mac")
+  " URLエンコード(英数字と -_.~/ 以外をUTF-8のバイト単位で %XX に変換)
+  function! s:UrlEncode(str) abort
+    let l:result = ''
+    for l:i in range(strlen(a:str))
+      let l:c = a:str[l:i]
+      if l:c =~# '[A-Za-z0-9_.~/-]'
+        let l:result .= l:c
+      else
+        let l:result .= printf('%%%02X', char2nr(l:c, 0))
+      endif
+    endfor
+    return l:result
+  endfunction
+
   function! OpenWithEditor()
     let l:file = expand('%:p')
 
-    " アプリの追加・変更はここだけ
-    let l:apps = {
-      \ 'VSCode':  'code '        . shellescape(l:file),
-      \ 'Bokuchi': 'open -a Bokuchi ' . shellescape(l:file),
-      \ 'MacVimRemoteTab': 'open -a MacVimRemoteTab ' . shellescape(l:file),
-    \ }
+    " アプリの追加・変更はここだけ(書いた順に一覧表示される)
+    let l:apps = [
+      \ ['VSCode',  'code '        . shellescape(l:file)],
+      \ ['Bokuchi', 'open -a Bokuchi ' . shellescape(l:file)],
+      \ ['MacVimRemoteTab', 'open -a MacVimRemoteTab ' . shellescape(l:file)],
+      \ ['Vestibulet Filer', 'open ' . shellescape('vestibulet://filer/open?path=' . s:UrlEncode(l:file))],
+      \ ['Vestibulet Shelf', 'vestibulet shelf add --show ' . shellescape(l:file)],
+      \ ['Vestibulet OpenRouter(ask)', 'vestibulet open-router ask ' . shellescape(l:file)],
+    \ ]
+    let l:cmds = {}
+    for [l:name, l:cmd] in l:apps
+      let l:cmds[l:name] = l:cmd
+    endfor
 
     call fzf#run(fzf#wrap({
-      \ 'source':  keys(l:apps),
-      \ 'sink':    {choice -> system(l:apps[choice])},
-      \ 'options': ['--prompt=Open with> ', '--height=~50%'],
+      \ 'source':  map(copy(l:apps), 'v:val[0]'),
+      \ 'sink':    {choice -> system(l:cmds[choice])},
+      \ 'options': ['--prompt=Open with> ', '--height=~50%', '--cycle'],
     \ }))
   endfunction
 

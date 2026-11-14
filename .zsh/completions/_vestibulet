@@ -46,7 +46,7 @@ _vestibulet_commands() {
     'bookmark:ブックマーク一覧・関連項目の取得'
     'item:ライブラリ項目の一覧'
     'shelf:一時棚への投入・一覧'
-    'filer:ファイラでディレクトリを開く'
+    'filer:ファイラでディレクトリ／ファイルを開く'
     'open-router:OpenRouter でファイルを開く（ルール／アプリ選択）'
     'help:ヘルプを表示'
     '--help:ヘルプを表示'
@@ -192,8 +192,10 @@ _vestibulet_shelf_add() {
     '--type[入力種別]:type:_vestibulet_types' \
     '--group[複数入力をグループ化して投入]' \
     '--stdin[標準入力から読み込む]' \
+    '--show[投入後にシェルフウィンドウを表示]' \
     '--format[出力形式]:format:_vestibulet_formats' \
     '--inbox[インボックスパス上書き]:path:_files -/' \
+    '--[これ以降を入力として扱う]' \
     '*:input:_files'
 }
 
@@ -225,14 +227,14 @@ _vestibulet_filer() {
 _vestibulet_filer_commands() {
   local -a commands
   commands=(
-    'open:アクティブペインの新規タブでディレクトリを開く（省略時は cwd）'
+    'open:ファイラで開く（dir=そのまま／file=親＋選択。省略時は cwd）'
   )
   _describe 'filer command' commands
 }
 
 _vestibulet_filer_open() {
   _arguments \
-    '1:directory:_files -/'
+    '1:path:_files'
 }
 
 _vestibulet_open_router() {
