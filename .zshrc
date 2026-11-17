@@ -492,12 +492,26 @@ function fzf-select-branch() {
       return
     fi
 
-    BUFFER="$BUFFER$(echo $branches | fzf --prompt '[GIT branch] ' | /usr/bin/awk -F ' ' '{print $NF}')"
+    BUFFER="$BUFFER$(echo $branches | fzf --prompt '[GIT branch] ' --preview 'git show --stat --color=always {-1}' | /usr/bin/awk -F ' ' '{print $NF}')"
     CURSOR=$#BUFFER
     zle redisplay
 }
 zle -N fzf-select-branch
 bindkey "^o^b" fzf-select-branch
+## }}}
+## C-o C-tでtag一覧を表示(新しい順) {{{
+function fzf-select-tag() {
+    local tags=$(git tag --sort=-creatordate 2> /dev/null)
+    if [ ! -n "$tags" ] ; then
+      return
+    fi
+
+    BUFFER="$BUFFER$(echo $tags | fzf --prompt '[GIT tag] ' --no-sort --preview 'git show --stat --color=always {}')"
+    CURSOR=$#BUFFER
+    zle redisplay
+}
+zle -N fzf-select-tag
+bindkey "^o^t" fzf-select-tag
 ## }}}
 ## C-o C-p pでbmのブックマークのパスを取得 {{{
 function fzf-select-bookmark() {
