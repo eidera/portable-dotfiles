@@ -815,6 +815,7 @@ xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
 " ,<Space>(カンマ + スペース)で主なキーを、キーか機能名で絞り込んで実行する(ビジュアルモードから開くとビジュアル用だけ)
 " 一覧は [キー(マッピングの表記), モード(n / x), 機能名]。増やすときはここに1行足す
 " 割り当てのないキーは一覧に出さない
+" キーの代わりにコマンドを実行するときは キーを '' にし、4つ目に {'run': Exコマンド, 'when': 表示する条件の式} を書く
 let s:palette_items = [
   \ ['<C-W><C-E>', 'n', '開いているファイルを外部アプリで開く'],
   \ ['<C-W><C-Y>', 'n', '開いているファイルのパス・リンクをコピー'],
@@ -828,22 +829,45 @@ function! s:PaletteLabel(key) abort
   return trim(substitute(a:key, '<C-\(\a\)>', '\="Ctrl+" . toupper(submatch(1)) . " "', 'g'))
 endfunction
 
+" 今のモードで出す項目(キーは割り当てがあるもの、'when' は条件を満たすもの)
 function! s:PaletteEntries(mode) abort
-  return filter(copy(s:palette_items), 'v:val[1] ==# a:mode && !empty(maparg(v:val[0], a:mode))')
+  let l:res = []
+  for l:it in s:palette_items
+    let l:opt = get(l:it, 3, {})
+    if l:it[1] !=# a:mode
+      continue
+    elseif empty(l:it[0]) ? !has_key(l:opt, 'run') : empty(maparg(l:it[0], a:mode))
+      continue
+    elseif has_key(l:opt, 'when') && !eval(l:opt.when)
+      continue
+    endif
+    call add(l:res, l:it)
+  endfor
+  return l:res
 endfunction
 
-" 選んだキーを、押したのと同じように送る(ビジュアルは gv で選択し直してから)
-function! s:PaletteRun(mode, key) abort
+function! s:PaletteExec(cmd, ...) abort
+  execute a:cmd
+endfunction
+
+" 選んだ項目を実行する。キーは押したのと同じように送る(ビジュアルは gv で選択し直してから)
+" コマンドは fzf を閉じて元のウィンドウに戻ってから実行する
+function! s:PaletteRun(mode, item) abort
+  let l:opt = get(a:item, 3, {})
+  if has_key(l:opt, 'run')
+    call timer_start(0, function('s:PaletteExec', [l:opt.run]))
+    return
+  endif
   if a:mode ==# 'x'
     call feedkeys('gv', 'n')
   endif
-  call feedkeys(eval('"' . substitute(escape(a:key, '\"'), '<', '\\<', 'g') . '"'), 'm')
+  call feedkeys(eval('"' . substitute(escape(a:item[0], '\"'), '<', '\\<', 'g') . '"'), 'm')
 endfunction
 
 function! s:PaletteSink(line) abort
   let l:i = str2nr(matchstr(a:line, '^\d\+'))
   if l:i >= 1 && l:i <= len(s:palette_current)
-    call s:PaletteRun(s:palette_mode, s:palette_current[l:i - 1][0])
+    call s:PaletteRun(s:palette_mode, s:palette_current[l:i - 1])
   endif
 endfunction
 
