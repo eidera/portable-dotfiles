@@ -811,6 +811,68 @@ nnoremap <C-W><C-Y> :<C-U>call <SID>CopyFileRef()<CR>
 nnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(0)<CR>
 xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
 " }}}
+" コマンドパレット {{{
+" ,<Space>(カンマ + スペース)で主なキーを、キーか機能名で絞り込んで実行する(ビジュアルモードから開くとビジュアル用だけ)
+" 一覧は [キー(マッピングの表記), モード(n / x), 機能名]。増やすときはここに1行足す
+" 割り当てのないキーは一覧に出さない
+let s:palette_items = [
+  \ ['<C-W><C-E>', 'n', '開いているファイルを外部アプリで開く'],
+  \ ['<C-W><C-Y>', 'n', '開いているファイルのパス・リンクをコピー'],
+  \ [',,o', 'n', 'カーソル下のファイル/URL/リンクを開く'],
+  \ [',,o', 'x', '選択範囲のファイル/URL/リンクを開く'],
+  \ ]
+
+" --- ここから下は dotfiles / portable-dotfiles で共通 ---
+" <C-W><C-E> → Ctrl+W Ctrl+E
+function! s:PaletteLabel(key) abort
+  return trim(substitute(a:key, '<C-\(\a\)>', '\="Ctrl+" . toupper(submatch(1)) . " "', 'g'))
+endfunction
+
+function! s:PaletteEntries(mode) abort
+  return filter(copy(s:palette_items), 'v:val[1] ==# a:mode && !empty(maparg(v:val[0], a:mode))')
+endfunction
+
+" 選んだキーを、押したのと同じように送る(ビジュアルは gv で選択し直してから)
+function! s:PaletteRun(mode, key) abort
+  if a:mode ==# 'x'
+    call feedkeys('gv', 'n')
+  endif
+  call feedkeys(eval('"' . substitute(escape(a:key, '\"'), '<', '\\<', 'g') . '"'), 'm')
+endfunction
+
+function! s:PaletteSink(line) abort
+  let l:i = str2nr(matchstr(a:line, '^\d\+'))
+  if l:i >= 1 && l:i <= len(s:palette_current)
+    call s:PaletteRun(s:palette_mode, s:palette_current[l:i - 1][0])
+  endif
+endfunction
+
+function! s:Palette(mode) abort
+  let s:palette_mode = a:mode
+  let s:palette_current = s:PaletteEntries(a:mode)
+  if empty(s:palette_current)
+    echo 'palette: 使えるキーがありません'
+    return
+  endif
+  let l:lines = map(copy(s:palette_current), 'printf("%d\t%-16s %s", v:key + 1, s:PaletteLabel(v:val[0]), v:val[2])')
+  if exists('*fzf#run') && exists('*fzf#wrap')
+    call fzf#run(fzf#wrap({
+      \ 'source':  l:lines,
+      \ 'sink':    function('s:PaletteSink'),
+      \ 'options': ['--prompt=palette> ', '--layout=reverse', '--height=~50%', '--cycle', '--no-multi',
+      \              '--delimiter=' . "\t", '--with-nth=2..'],
+      \ }))
+  else
+    let l:n = inputlist(['palette:'] + map(copy(l:lines), 'substitute(v:val, "\t", ". ", "")'))
+    if l:n >= 1 && l:n <= len(l:lines)
+      call s:PaletteSink(l:lines[l:n - 1])
+    endif
+  endif
+endfunction
+
+nnoremap <silent> ,<Space> :<C-u>call <SID>Palette('n')<CR>
+xnoremap <silent> ,<Space> :<C-u>call <SID>Palette('x')<CR>
+" }}}
 " 開いているファイルをVSCodeなどいくつかのアプリケーションをfzfで選択的に開く {{{
 if has("mac")
   " s:UrlEncode は「ファイル・URL のユーティリティ」で定義
