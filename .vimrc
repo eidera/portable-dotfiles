@@ -337,22 +337,483 @@ tmap <C-W>[ <C-W>N " terminal-normalモードへの移行キーをscreenぽい�
 nnoremap ,vv :<C-U>vert terminal<CR>
 nnoremap ,vs :<C-U>terminal<CR>
 " }}}
-" 開いているファイルをVSCodeなどいくつかのアプリケーションをfzfで選択的に開く {{{
-if has("mac")
-  " URLエンコード(英数字と -_.~/ 以外をUTF-8のバイト単位で %XX に変換)
-  function! s:UrlEncode(str) abort
-    let l:result = ''
-    for l:i in range(strlen(a:str))
-      let l:c = a:str[l:i]
-      if l:c =~# '[A-Za-z0-9_.~/-]'
-        let l:result .= l:c
-      else
-        let l:result .= printf('%%%02X', char2nr(l:c, 0))
+" ファイル・URL のユーティリティ {{{
+" ┌──────────────┬──────────────────────────────────────────────────────────────────┐
+" │     キー     │                               動作                               │
+" ├──────────────┼──────────────────────────────────────────────────────────────────┤
+" │ <C-W><C-Y>   │ 今のファイルのパス / file URI / リンクを選んでコピー             │
+" │ ,,o          │ カーソル下(ビジュアルは選択範囲)のファイル / URL / リンクを開く  │
+" └──────────────┴──────────────────────────────────────────────────────────────────┘
+" ,,o の対象(この順で判定): Markdown リンク [t](dest) → 自動リンク <scheme://...>
+"   → 参照リンク [t][ref] / [ref] → scheme://... → ファイル名(:行(:列) 付き可)
+" ファイルは新しいタブで開く。ディレクトリは netrw、テキスト以外は外部アプリ。存在しなければエラー
+
+" URLエンコード(英数字と -_.~/ 以外をUTF-8のバイト単位で %XX に変換)
+function! s:UrlEncode(str) abort
+  let l:result = ''
+  for l:i in range(strlen(a:str))
+    let l:c = a:str[l:i]
+    if l:c =~# '[A-Za-z0-9_.~/-]'
+      let l:result .= l:c
+    else
+      let l:result .= printf('%%%02X', char2nr(l:c, 0))
+    endif
+  endfor
+  return l:result
+endfunction
+
+" %XX をバイトとして戻す
+function! s:UrlDecode(str) abort
+  if a:str !~# '%\x\x'
+    return a:str
+  endif
+  return eval('"' . substitute(escape(a:str, '\"'), '%\(\x\x\)', '\\x\1', 'g') . '"')
+endfunction
+
+function! s:FileUtilError(msg) abort
+  echohl ErrorMsg | echo a:msg | echohl None
+endfunction
+
+" --- <C-W><C-Y>: コピー ---
+" [表記, コピーする文字列] の一覧
+function! s:FileRefs() abort
+  let l:path = resolve(expand('%:p'))
+  let l:label = escape(fnamemodify(l:path, ':t'), '\[]')
+  let l:uri = 'file://' . s:UrlEncode(l:path)
+  " スペースや括弧を含むときだけ < > で囲む(CommonMark)
+  let l:dest = l:path =~# '[[:space:]()<>]' ? '<' . escape(l:path, '<>') . '>' : l:path
+  return [
+    \ ['ファイルパス', l:path],
+    \ ['file URI', l:uri],
+    \ ['絶対パスファイルリンク(absolute path)', printf('[%s](%s)', l:label, l:dest)],
+    \ ['file URIリンク', printf('[%s](%s)', l:label, l:uri)],
+    \ ]
+endfunction
+
+function! s:CopyText(text) abort
+  call setreg('"', a:text)
+  if has('clipboard')
+    call setreg('+', a:text)
+  endif
+  redraw
+  echo 'Copied: ' . a:text
+endfunction
+
+function! s:CopyFileRefSink(line) abort
+  let l:i = str2nr(matchstr(a:line, '^\d\+')) - 1
+  if l:i >= 0 && l:i < len(s:file_refs)
+    call s:CopyText(s:file_refs[l:i][1])
+  endif
+endfunction
+
+function! s:CopyFileRef() abort
+  if empty(expand('%'))
+    call s:FileUtilError('copy: ファイル名のないバッファです')
+    return
+  endif
+  let s:file_refs = s:FileRefs()
+  let l:items = map(copy(s:file_refs), '(v:key + 1) . ". " . v:val[0] . ": " . v:val[1]')
+  if exists('*fzf#run') && exists('*fzf#wrap')
+    call fzf#run(fzf#wrap({
+      \ 'source':  l:items,
+      \ 'sink':    function('s:CopyFileRefSink'),
+      \ 'options': ['--prompt=Copy> ', '--height=~50%', '--cycle'],
+      \ }))
+  else
+    let l:n = inputlist(['Copy:'] + l:items)
+    if l:n >= 1 && l:n <= len(l:items)
+      call s:CopyFileRefSink(l:items[l:n - 1])
+    endif
+  endif
+endfunction
+
+" --- ,,o: 開く ---
+let s:open_external_exts = [
+  \ 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'heic', 'svg', 'ico',
+  \ 'mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm', 'mp3', 'm4a', 'wav', 'flac', 'aac',
+  \ 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'key', 'numbers', 'pages',
+  \ 'zip', 'gz', 'tgz', 'bz2', 'xz', '7z', 'rar', 'dmg',
+  \ ]
+
+" 外部アプリで開く。kind は 'url' か 'file'
+function! s:OpenExternal(target, kind) abort
+  if has('mac')
+    let l:cmd = ['open', a:target]
+  elseif get(s:, 'is_termux', 0) || exists('$TERMUX_VERSION')
+    let l:cmd = [a:kind ==# 'url' ? 'termux-open-url' : 'termux-open', a:target]
+  else
+    let l:cmd = ['xdg-open', a:target]
+  endif
+  if !executable(l:cmd[0])
+    call s:FileUtilError('open: ' . l:cmd[0] . ' が見つかりません')
+    return
+  endif
+  if has('job')
+    call job_start(l:cmd, {'stoponexit': ''})
+  else
+    call system(join(map(copy(l:cmd), 'shellescape(v:val)')) . ' >/dev/null 2>&1 &')
+  endif
+  echo 'open: ' . a:target
+endfunction
+
+" str 中の pat の全一致を [matchlist, 開始, 終了](0始まりのバイト位置・終了は含まない)で返す
+function! s:AllMatches(str, pat) abort
+  let l:res = []
+  let l:start = 0
+  while 1
+    let l:pos = matchstrpos(a:str, a:pat, l:start)
+    if l:pos[1] < 0
+      return l:res
+    endif
+    call add(l:res, [matchlist(a:str, a:pat, l:pos[1]), l:pos[1], l:pos[2]])
+    let l:start = max([l:pos[2], l:pos[1] + 1])
+  endwhile
+endfunction
+
+" 参照リンクの定義 [ref]: dest を今のバッファから集める(キーは小文字)
+function! s:RefDefinitions() abort
+  let l:defs = {}
+  for l:line in getline(1, '$')
+    let l:m = matchlist(l:line, '^ \{0,3}\[\([^]]\+\)\]:\s*\(<[^>]*>\|\S\+\)')
+    if !empty(l:m) && !has_key(l:defs, tolower(l:m[1]))
+      let l:defs[tolower(l:m[1])] = s:MdUnescape(l:m[2])
+    endif
+  endfor
+  return l:defs
+endfunction
+
+" Markdown のバックスラッシュエスケープ(\[ など)を戻す
+function! s:MdUnescape(str) abort
+  return substitute(a:str, '\\\([[:punct:]]\)', '\1', 'g')
+endfunction
+
+" URL 末尾の句読点と対になっていない閉じ括弧を外す
+function! s:TrimUrl(url) abort
+  let l:url = a:url
+  while !empty(l:url)
+    let l:last = l:url[-1:]
+    if l:last =~# '[.,;:!?''"*]'
+      let l:url = l:url[:-2]
+    elseif l:last ==# ')' && count(l:url, ')') > count(l:url, '(')
+      let l:url = l:url[:-2]
+    elseif l:last ==# ']' && count(l:url, ']') > count(l:url, '[')
+      let l:url = l:url[:-2]
+    else
+      break
+    endif
+  endwhile
+  return l:url
+endfunction
+
+let s:open_scheme_pat = '[A-Za-z][A-Za-z0-9+.-]*://'
+" Markdown の宛先: <...> か、空白を含まず1段の括弧を許す文字列。後ろに "タイトル" を許す
+let s:md_dest_pat = '\(<[^<>]*>\|\%([^()[:space:]]\|([^()[:space:]]*)\)\+\)\%(\s\+"[^"]*"\)\='
+
+" 1行の中のリンクを全部拾う。要素は {'s': 開始, 'e': 終了, 'pri': 優先度, 'cands': 試す文字列}
+" pri: 1=インラインリンク 2=自動リンク 3=参照リンク 4=scheme:// (ここまでは明示的なリンク)
+"      5=引用符の中 6=\ エスケープの空白を含む名前 7=isfname の文字を : でつないだもの 8=その : 区切りの部分
+function! s:LinksInLine(line, defs) abort
+  let l:items = []
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, '\[\%([^]\\]\|\\.\)*\](' . s:md_dest_pat . ')')
+    call add(l:items, {'s': l:s, 'e': l:e, 'pri': 1, 'cands': [s:MdUnescape(l:m[1])]})
+  endfor
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, '<\(' . s:open_scheme_pat . '[^<>[:space:]]*\)>')
+    call add(l:items, {'s': l:s, 'e': l:e, 'pri': 2, 'cands': [l:m[1]]})
+  endfor
+  " [text][ref] / [ref][] / [ref]。定義があるものだけ
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, '\[\(\%([^]\\]\|\\.\)\+\)\]\%(\[\([^]]*\)\]\)\=')
+    let l:key = tolower(empty(l:m[2]) ? l:m[1] : l:m[2])
+    if has_key(a:defs, l:key)
+      call add(l:items, {'s': l:s, 'e': l:e, 'pri': 3, 'cands': [a:defs[l:key]]})
+    endif
+  endfor
+  " ASCII の空白以外。日本語が続いていてもそこで切る
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, s:open_scheme_pat . '\%([!-~]\&[^<>"`]\)*')
+    call add(l:items, {'s': l:s, 'e': l:e, 'pri': 4, 'cands': [s:TrimUrl(l:m[0])]})
+  endfor
+  for l:q in ['"', "'"]
+    for [l:m, l:s, l:e] in s:AllMatches(a:line, l:q . '\([^' . l:q . ']\+\)' . l:q)
+      call add(l:items, {'s': l:s, 'e': l:e, 'pri': 5, 'cands': [l:m[1]]})
+    endfor
+  endfor
+  let l:fc = '\%(\f\|\\ \)'
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, l:fc . '\+\%(:' . l:fc . '\+\)*')
+    if l:m[0] =~# '\\ '
+      call add(l:items, {'s': l:s, 'e': l:e, 'pri': 6, 'cands': [substitute(l:m[0], '\\ ', ' ', 'g')]})
+    endif
+  endfor
+  for [l:m, l:s, l:e] in s:AllMatches(a:line, '\f\+\%(:\f\+\)*')
+    call add(l:items, {'s': l:s, 'e': l:e, 'pri': 7, 'cands': [l:m[0]]})
+    if l:m[0] =~# ':'
+      for [l:p, l:ps, l:pe] in s:AllMatches(l:m[0], '\f\+')
+        call add(l:items, {'s': l:s + l:ps, 'e': l:s + l:pe, 'pri': 8, 'cands': [l:p[0]]})
+      endfor
+    endif
+  endfor
+  return l:items
+endfunction
+
+" カーソル位置の候補(試す順)。明示的なリンクの上ならそれだけ
+function! s:CandsAtCursor() abort
+  let l:col = col('.') - 1
+  let l:items = filter(s:LinksInLine(getline('.'), s:RefDefinitions()), 'v:val.s <= l:col && l:col < v:val.e')
+  call sort(l:items, {a, b -> a.pri - b.pri})
+  if empty(l:items)
+    return []
+  elseif l:items[0].pri <= 4
+    return l:items[0].cands
+  endif
+  let l:cands = []
+  for l:it in l:items
+    let l:cands += l:it.cands
+  endfor
+  return uniq(l:cands)
+endfunction
+
+" 行の中で開く対象(重なりは優先度の高いものを採り、出現順に並べる)
+function! s:LinksToOpen(line, defs) abort
+  let l:items = sort(s:LinksInLine(a:line, a:defs), {a, b -> a.pri != b.pri ? a.pri - b.pri : a.s - b.s})
+  let l:taken = []
+  for l:it in l:items
+    if l:it.pri == 8 || !empty(filter(copy(l:taken), 'l:it.s < v:val.e && v:val.s < l:it.e'))
+      continue
+    endif
+    " ファイル名は / を含むか ~/ ./ で始まるものだけ
+    if l:it.pri == 7 && l:it.cands[0] !~# '/'
+      continue
+    endif
+    call add(l:taken, l:it)
+  endfor
+  return sort(l:taken, {a, b -> a.s - b.s})
+endfunction
+
+" v で1行の中だけを選んだときの文字列。それ以外は ''
+function! s:VisualText() abort
+  if visualmode() !=# 'v' || line("'<") != line("'>")
+    return ''
+  endif
+  let l:s = getline("'<")
+  let l:c1 = col("'<") - 1
+  let l:c2 = col("'>") - 1
+  let l:end = l:c2 + strlen(matchstr(l:s[l:c2 :], '.'))
+  return trim(l:s[l:c1 : l:end - 1])
+endfunction
+
+" ~ と $VAR / ${VAR} だけを展開する(ワイルドカードは展開しない)
+function! s:ExpandPath(p) abort
+  let l:p = substitute(a:p, '^\~\ze\%(/\|$\)', '\=$HOME', '')
+  return substitute(l:p, '\$\%(\(\w\+\)\|{\(\w\+\)}\)',
+    \ '\=getenv(submatch(1) . submatch(2)) is v:null ? submatch(0) : getenv(submatch(1) . submatch(2))', 'g')
+endfunction
+
+" p を実在のパスに解決する(相対パスは今のファイルのディレクトリ → カレントの順)。なければ ''
+function! s:ResolvePath(p) abort
+  let l:p = s:ExpandPath(a:p)
+  if empty(l:p)
+    return ''
+  endif
+  if l:p =~# '^/'
+    let l:cands = [l:p]
+  else
+    let l:cands = []
+    if !empty(expand('%'))
+      call add(l:cands, expand('%:p:h') . '/' . l:p)
+    endif
+    call add(l:cands, getcwd() . '/' . l:p)
+  endif
+  for l:c in l:cands
+    if filereadable(l:c) || isdirectory(l:c)
+      return simplify(l:c)
+    endif
+  endfor
+  return ''
+endfunction
+
+" 見出しのスラッグ(GitHub 風: 小文字化・ASCII 記号を除く・空白を - に)
+function! s:HeadingSlug(text) abort
+  let l:t = tolower(trim(a:text))
+  let l:t = substitute(l:t, '[!"#$%&''()*+,./:;<=>?@\[\\\]^`{|}~]', '', 'g')
+  return substitute(l:t, '\s', '-', 'g')
+endfunction
+
+function! s:JumpHeading(frag) abort
+  let l:want = s:HeadingSlug(a:frag)
+  for l:lnum in range(1, line('$'))
+    let l:m = matchlist(getline(l:lnum), '^#\{1,6}\s\+\(.\{-}\)\s*#*\s*$')
+    if !empty(l:m) && s:HeadingSlug(l:m[1]) ==# l:want
+      call cursor(l:lnum, 1)
+      return
+    endif
+  endfor
+  echohl WarningMsg | echo 'open: 見出しが見つかりません: #' . a:frag | echohl None
+endfunction
+
+function! s:OpenPath(path, lnum, cnum, frag) abort
+  if isdirectory(a:path)
+    execute 'tabedit ' . fnameescape(a:path)
+    return
+  endif
+  if index(s:open_external_exts, tolower(fnamemodify(a:path, ':e'))) >= 0
+    call s:OpenExternal(a:path, 'file')
+    return
+  endif
+  execute 'tabedit ' . fnameescape(a:path)
+  if a:lnum > 0
+    call cursor(a:lnum, a:cnum > 0 ? a:cnum : 1)
+  elseif !empty(a:frag)
+    call s:JumpHeading(a:frag)
+  endif
+endfunction
+
+" 文字列 target を開く対象に解決する
+" {'kind': 'url', 'url': ...} / {'kind': 'path', 'path': ..., 'lnum', 'cnum', 'frag'}。見つからなければ {}
+function! s:ResolveTarget(target) abort
+  let l:t = trim(a:target)
+  if l:t =~# '^<.*>$'
+    let l:t = substitute(l:t[1:-2], '\\\([<>]\)', '\1', 'g')
+  endif
+  if empty(l:t)
+    return {}
+  endif
+  " file:// はファイルとして扱う
+  if l:t =~? '^file://'
+    let l:rest = substitute(l:t, '\c^file://\%(localhost\)\=', '', '')
+    let l:path = s:UrlDecode(substitute(l:rest, '#.*', '', ''))
+    if filereadable(l:path) || isdirectory(l:path)
+      return {'kind': 'path', 'path': l:path, 'lnum': 0, 'cnum': 0, 'frag': s:UrlDecode(matchstr(l:rest, '#\zs.*'))}
+    endif
+    return {}
+  endif
+  if l:t =~# '^' . s:open_scheme_pat
+    return {'kind': 'url', 'url': l:t}
+  endif
+  " ファイル: そのまま → :行(:列) を外す → #見出し を外す → 末尾の日本語を外す。それぞれ %XX を戻した形も試す
+  let l:tries = [[l:t, 0, 0, '']]
+  let l:m = matchlist(l:t, '^\(.\{-1,}\):\(\d\+\)\%(:\(\d\+\)\)\=$')
+  if !empty(l:m)
+    call add(l:tries, [l:m[1], str2nr(l:m[2]), str2nr(l:m[3]), ''])
+  endif
+  let l:m = matchlist(l:t, '^\([^#]\+\)#\(.*\)$')
+  if !empty(l:m)
+    call add(l:tries, [l:m[1], 0, 0, l:m[2]])
+  endif
+  " 「foo.mdを参照」のように日本語が続いている場合
+  let l:ascii = substitute(l:t, '[^\x01-\x7f]\+$', '', '')
+  if l:ascii !=# l:t && !empty(l:ascii)
+    call add(l:tries, [l:ascii, 0, 0, ''])
+  endif
+  for l:decode in [0, 1]
+    for [l:p, l:lnum, l:cnum, l:frag] in l:tries
+      let l:path = s:ResolvePath(l:decode ? s:UrlDecode(l:p) : l:p)
+      if !empty(l:path)
+        return {'kind': 'path', 'path': l:path, 'lnum': l:lnum, 'cnum': l:cnum, 'frag': l:decode ? s:UrlDecode(l:frag) : l:frag}
       endif
     endfor
-    return l:result
-  endfunction
+  endfor
+  return {}
+endfunction
 
+function! s:OpenResolved(r) abort
+  if a:r.kind ==# 'url'
+    call s:OpenExternal(a:r.url, 'url')
+  else
+    call s:OpenPath(a:r.path, a:r.lnum, a:r.cnum, a:r.frag)
+  endif
+endfunction
+
+" 候補を順に試し、最初に解決できたものを開く
+function! s:OpenFirst(cands) abort
+  if empty(a:cands) || empty(trim(a:cands[0]))
+    call s:FileUtilError('open: 対象がありません')
+    return
+  endif
+  for l:c in a:cands
+    let l:r = s:ResolveTarget(l:c)
+    if !empty(l:r)
+      call s:OpenResolved(l:r)
+      return
+    endif
+  endfor
+  call s:FileUtilError('open: 見つかりません: ' . trim(a:cands[0]))
+endfunction
+
+" 範囲の各行のリンクを全部開く(出現順・重複は1つに)
+function! s:OpenLinesInRange(l1, l2) abort
+  let l:defs = s:RefDefinitions()
+  let l:targets = []
+  let l:seen = {}
+  let l:missing = []
+  for l:lnum in range(a:l1, a:l2)
+    let l:line = getline(l:lnum)
+    let l:found = 0
+    for l:it in s:LinksToOpen(l:line, l:defs)
+      let l:r = s:ResolveTarget(l:it.cands[0])
+      if empty(l:r)
+        " 明示的なリンクだけ「見つからない」に数える(引用符やファイル名らしき文字列は黙って捨てる)
+        if l:it.pri <= 4 && index(l:missing, l:it.cands[0]) < 0
+          call add(l:missing, l:it.cands[0])
+        endif
+        continue
+      endif
+      let l:found = 1
+      let l:key = l:r.kind ==# 'url' ? l:r.url : l:r.path
+      if !has_key(l:seen, l:key)
+        let l:seen[l:key] = 1
+        call add(l:targets, l:r)
+      endif
+    endfor
+    " 開けるものがなく、行全体が実在するパスなら(空白を含むパスの一覧用)
+    if !l:found && !empty(trim(l:line))
+      let l:r = s:ResolveTarget(l:line)
+      if !empty(l:r) && l:r.kind ==# 'path' && !has_key(l:seen, l:r.path)
+        let l:seen[l:r.path] = 1
+        call add(l:targets, l:r)
+      endif
+    endif
+  endfor
+  if len(l:targets) > s:open_confirm_over
+    redraw
+    if input(printf('%d件開きます。よろしいですか? (y/[n]): ', len(l:targets))) !=# 'y'
+      redraw
+      echo 'open: 中止しました'
+      return
+    endif
+  endif
+  for l:r in l:targets
+    call s:OpenResolved(l:r)
+  endfor
+  redraw
+  let l:msg = printf('開いた: %d件 / 見つからない: %d件', len(l:targets), len(l:missing))
+  if !empty(l:missing)
+    let l:msg .= ' (' . join(l:missing[:2], ', ') . (len(l:missing) > 3 ? ', …' : '') . ')'
+  endif
+  echo 'open: ' . l:msg
+endfunction
+
+" これより多く開くときは確認する
+let s:open_confirm_over = 5
+
+function! s:OpenUnderCursor(visual) abort
+  if !a:visual
+    call s:OpenFirst(s:CandsAtCursor())
+    return
+  endif
+  " v で1行の中だけを選んだときは、選んだ文字列そのものを開く
+  let l:text = s:VisualText()
+  if !empty(l:text)
+    call s:OpenFirst([l:text])
+  else
+    call s:OpenLinesInRange(line("'<"), line("'>"))
+  endif
+endfunction
+
+nnoremap <C-W><C-Y> :<C-U>call <SID>CopyFileRef()<CR>
+nnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(0)<CR>
+xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
+" }}}
+" 開いているファイルをVSCodeなどいくつかのアプリケーションをfzfで選択的に開く {{{
+if has("mac")
+  " s:UrlEncode は「ファイル・URL のユーティリティ」で定義
   function! OpenWithEditor()
     let l:file = expand('%:p')
 
