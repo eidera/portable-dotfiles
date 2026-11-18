@@ -417,7 +417,7 @@ function! s:CopyFileRef() abort
     call fzf#run(fzf#wrap({
       \ 'source':  l:items,
       \ 'sink':    function('s:CopyFileRefSink'),
-      \ 'options': ['--prompt=Copy> ', '--height=~50%', '--cycle'],
+      \ 'options': ['--prompt=Copy> ', '--layout=reverse', '--height=~50%', '--cycle'],
       \ }))
   else
     let l:n = inputlist(['Copy:'] + l:items)
@@ -834,7 +834,7 @@ if has("mac")
     call fzf#run(fzf#wrap({
       \ 'source':  map(copy(l:apps), 'v:val[0]'),
       \ 'sink':    {choice -> system(l:cmds[choice])},
-      \ 'options': ['--prompt=Open with> ', '--height=~50%', '--cycle'],
+      \ 'options': ['--prompt=Open with> ', '--layout=reverse', '--height=~50%', '--cycle'],
     \ }))
   endfunction
 
