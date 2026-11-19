@@ -311,7 +311,7 @@ endfunction
 " ↓「:wq」と同じだと思われる
 nnoremap <C-W><C-Q> nop
 " }}}
-" project-localのrootにcd {{{
+" current-fileのディレクトリにcd {{{
 function! CdCurrentFile()
   exe 'lcd %:h'
 endfunction
@@ -816,11 +816,24 @@ xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
 " 一覧は [キー(マッピングの表記), モード(n / x), 機能名]。増やすときはここに1行足す
 " 割り当てのないキーは一覧に出さない
 " キーの代わりにコマンドを実行するときは キーを '' にし、4つ目に {'run': Exコマンド, 'when': 表示する条件の式} を書く
+" サブメニューは キーを '' にし、4つ目に {'menu': 名前} を書く。中身は s:palette_menus[名前] に同じ形式で並べる
+" サブメニューの中にも 'menu' の項目を置ける(何段でも)。中に出せる項目がないサブメニューは一覧に出さない
+let s:palette_menus = {
+  \ 'utilities': [
+  \   [',cdf', 'n', 'このウィンドウのカレントディレクトリを開いているファイルの場所に(lcd)'],
+  \   [',cdp', 'n', 'このウィンドウのカレントディレクトリをプロジェクトのルートに(lcd)'],
+  \   ['<C-W><C-U><C-T>', 'n', '開いているファイルを utf-8 で開き直す'],
+  \   ['<C-W><C-W><C-R>', 'n', 'ウィンドウのサイズを変える WinResizer'],
+  \   ['<C-W><C-W><C-G>', 'n', 'GUI のウィンドウのサイズを変える WinResizer'],
+  \   ['', 'n', 'リモートリポジトリ(GitHub など)の今の行の URL をコピー YankRemoteURL', {'run': 'YankRemoteURL', 'when': 'exists(":YankRemoteURL") == 2'}],
+  \ ],
+  \ }
 let s:palette_items = [
   \ ['<C-W><C-E>', 'n', '開いているファイルを外部アプリで開く'],
   \ ['<C-W><C-Y>', 'n', '開いているファイルのパス・リンクをコピー'],
   \ [',,o', 'n', 'カーソル下のファイル/URL/リンクを開く'],
   \ [',,o', 'x', '選択範囲のファイル/URL/リンクを開く'],
+  \ ['', 'n', 'utilities ...', {'menu': 'utilities'}],
   \ ]
 
 " --- ここから下は dotfiles / portable-dotfiles で共通 ---
@@ -829,16 +842,21 @@ function! s:PaletteLabel(key) abort
   return trim(substitute(a:key, '<C-\(\a\)>', '\="Ctrl+" . toupper(submatch(1)) . " "', 'g'))
 endfunction
 
-" 今のモードで出す項目(キーは割り当てがあるもの、'when' は条件を満たすもの)
-function! s:PaletteEntries(mode) abort
+" items のうち今のモードで出す項目(キーは割り当てがあるもの、'when' は条件を満たすもの、'menu' は中に出せる項目があるもの)
+" a:1 は中身を調べている途中のサブメニューの名前(互いに開き合うサブメニューで止まらないように)
+function! s:PaletteEntries(mode, items, ...) abort
+  let l:seen = get(a:, 1, [])
   let l:res = []
-  for l:it in s:palette_items
+  for l:it in a:items
     let l:opt = get(l:it, 3, {})
     if l:it[1] !=# a:mode
       continue
-    elseif empty(l:it[0]) ? !has_key(l:opt, 'run') : empty(maparg(l:it[0], a:mode))
+    elseif empty(l:it[0]) ? !has_key(l:opt, 'run') && !has_key(l:opt, 'menu') : empty(maparg(l:it[0], a:mode))
       continue
     elseif has_key(l:opt, 'when') && !eval(l:opt.when)
+      continue
+    elseif has_key(l:opt, 'menu') && (index(l:seen, l:opt.menu) >= 0
+          \ || empty(s:PaletteEntries(a:mode, get(s:palette_menus, l:opt.menu, []), l:seen + [l:opt.menu])))
       continue
     endif
     call add(l:res, l:it)
@@ -851,10 +869,13 @@ function! s:PaletteExec(cmd, ...) abort
 endfunction
 
 " 選んだ項目を実行する。キーは押したのと同じように送る(ビジュアルは gv で選択し直してから)
-" コマンドは fzf を閉じて元のウィンドウに戻ってから実行する
+" コマンドとサブメニューは fzf を閉じて元のウィンドウに戻ってから実行する(開く)
 function! s:PaletteRun(mode, item) abort
   let l:opt = get(a:item, 3, {})
-  if has_key(l:opt, 'run')
+  if has_key(l:opt, 'menu')
+    call timer_start(0, function('s:Palette', [a:mode, s:palette_path + [l:opt.menu]]))
+    return
+  elseif has_key(l:opt, 'run')
     call timer_start(0, function('s:PaletteExec', [l:opt.run]))
     return
   endif
@@ -871,23 +892,29 @@ function! s:PaletteSink(line) abort
   endif
 endfunction
 
-function! s:Palette(mode) abort
+" a:1 は開くサブメニューの名前の並び(['utilities'] なら utilities。省略で一番上)
+function! s:Palette(mode, ...) abort
   let s:palette_mode = a:mode
-  let s:palette_current = s:PaletteEntries(a:mode)
+  let s:palette_path = get(a:, 1, [])
+  let l:items = empty(s:palette_path) ? s:palette_items : get(s:palette_menus, s:palette_path[-1], [])
+  let s:palette_current = s:PaletteEntries(a:mode, l:items)
+  let l:title = join(['palette'] + s:palette_path, '/')
   if empty(s:palette_current)
-    echo 'palette: 使えるキーがありません'
+    echo l:title . ': 使えるキーがありません'
     return
   endif
-  let l:lines = map(copy(s:palette_current), 'printf("%d\t%-16s %s", v:key + 1, s:PaletteLabel(v:val[0]), v:val[2])')
+  " キーの列の幅は 16 か、一番長いキーに合わせる
+  let l:w = max([16] + map(copy(s:palette_current), 'strwidth(s:PaletteLabel(v:val[0]))'))
+  let l:lines = map(copy(s:palette_current), 'printf("%d\t%-*s %s", v:key + 1, l:w, s:PaletteLabel(v:val[0]), v:val[2])')
   if exists('*fzf#run') && exists('*fzf#wrap')
     call fzf#run(fzf#wrap({
       \ 'source':  l:lines,
       \ 'sink':    function('s:PaletteSink'),
-      \ 'options': ['--prompt=palette> ', '--layout=reverse', '--height=~50%', '--cycle', '--no-multi',
+      \ 'options': ['--prompt=' . l:title . '> ', '--layout=reverse', '--height=~50%', '--cycle', '--no-multi',
       \              '--delimiter=' . "\t", '--with-nth=2..'],
       \ }))
   else
-    let l:n = inputlist(['palette:'] + map(copy(l:lines), 'substitute(v:val, "\t", ". ", "")'))
+    let l:n = inputlist([l:title . ':'] + map(copy(l:lines), 'substitute(v:val, "\t", ". ", "")'))
     if l:n >= 1 && l:n <= len(l:lines)
       call s:PaletteSink(l:lines[l:n - 1])
     endif
