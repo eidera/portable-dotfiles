@@ -1130,6 +1130,7 @@ Plug 'Omochice/yank-remote-url.vim', { 'commit': '6b6d604ae7bf974d0733340f4d4338
 Plug 'aklt/plantuml-syntax', {'commit': '9d4900aa16674bf5bb8296a72b975317d573b547' }
 Plug 'supermomonga/projectlocal.vim', { 'commit': '4cc075b8be68f843d78e6a4cbbe4eaa1ecb1a31d' }
 Plug 'vim-scripts/MultipleSearch', { 'tag': '1.3' }
+Plug 'preservim/nerdtree', { 'commit': '690d061b591525890f1471c6675bcb5bdc8cdff9' }
 Plug 'Shougo/vimfiler.vim', {'commit': '69d5bc6070d5b3ff4e73719d970bae50a71d2c67' }
 Plug 'Shougo/vimproc.vim', { 'tag': 'ver.10.0', 'do': 'make' }
 
@@ -1411,8 +1412,11 @@ command! -nargs=0 MakeProjectFileForProjectlocal :call MakeProjectFileForProject
 " unite bmの設定 {{{
 nnoremap <C-W><C-R>oo :<C-U>Unite bm/list<CR>
 " }}}
+" nerdtreeの設定 {{{
+nnoremap <silent> ,,f :NERDTreeToggle<CR>
+" }}}
 " VimFiler.vimの設定 {{{
-nnoremap <silent> ,,f :<C-u>VimFilerBufferDir<CR>
+nnoremap <silent> ,,F :<C-u>VimFilerBufferDir<CR>
 " }}}
 " lightline.vimの設定 {{{
 "        \ 'colorscheme': 'solarized',
