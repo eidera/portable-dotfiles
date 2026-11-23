@@ -1589,6 +1589,16 @@ endfunction
 "nnoremap <C-c>,k :call RecoveryHowmKeybind()<CR>
 execute 'nnoremap ' . QFixHowm_Key . ',k :call RecoveryHowmKeybind()<CR>'
 
+" howm_dir 配下のファイルに入ったら自動でリカバリーする
+" (~/howm はシンボリックリンクで、Vim はリンク先の実パスでファイルを開くため、
+"  qfixmemo の IsQFixMemo() がメモと判定できずキーバインドが設定されない)
+augroup MyHowmAutoRecovery
+  autocmd!
+  autocmd BufEnter * if !get(g:, 'disable_qfixmemo', 0)
+    \ && stridx(resolve(expand('%:p')), resolve(expand(g:howm_dir)) . '/') == 0
+    \ | call RecoveryHowmKeybind() | endif
+augroup END
+
 function! InsertTitleForHowmDiary()
     let title = substitute(expand('%:t:r'), '-diary$', '', '')
     " 現在行の下に挿入
