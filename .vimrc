@@ -1572,6 +1572,10 @@ let QFixHowm_DiaryFile     = 'diary/%Y/%m/%Y-%m-%d-diary.md'
 let QFixHowm_ListReminderCacheTime = 0 " TODO一覧でキャッシュを利用しない
 let g:qfixmemo_use_addtime = 0 " ファイル保存時のタイムスタンプを自動挿入しない
 
+let g:QFixHowm_ReminderDefault_Deadline = 30 " 締切は30日前から表示する
+let QFixHowm_ShowScheduleMenu = 30   " メニュー画面で、予定は30日前から表示する
+let QFixHowm_ShowSchedule     = 30   " ,y の予定一覧で、予定は30日前から表示する
+
 let g:QFixHowm_SwitchListActionLock = ['{ }', '{o}', '{x}'] " default: ['{ }', '{*}', '{-}']
 
 " howm_dir のディレクトリがない環境では qfixmemo を無効化する
@@ -1598,7 +1602,55 @@ function! InsertTitleForHowmDiary()
 endfunction
 command! InsertTitleForHowmDiary call InsertTitleForHowmDiary()
 
-" マークダウンファイルでのTodoハイライト設定
+" qfixhowmのメニューで、長いファイル名の先頭を表示上だけ隠す {{{
+" qfixhowmメニュー：ファイル名を表示幅で切り詰め、空白で揃える
+let s:howm_name_width = 28   " ファイル名部分の表示幅（日本語は1文字2マス）(diaryの場合のパターンに合わせている)
+
+function! s:HowmMenuAlign() abort
+  if !search('^\%(howm\|sche\)://', 'nw') | return | endif
+  for id in get(w:, 'howm_align_ids', [])
+    silent! call matchdelete(id)
+  endfor
+  let w:howm_align_ids = []
+  if empty(prop_type_get('howm_pad', {'bufnr': bufnr()}))
+    call prop_type_add('howm_pad', {'bufnr': bufnr()})
+  endif
+  call prop_remove({'type': 'howm_pad', 'all': 1})
+  let pat = '^\(\%(howm\|sche\)://\)\(.\{-}\)\(|\d\+|\)'
+  let rows = []
+  for lnum in range(1, line('$'))
+    let m = matchlist(getline(lnum), pat)
+    if empty(m) | continue | endif
+    let [scheme, name, num] = [m[1], m[2], m[3]]
+    " 表示幅が収まるまで先頭から削る
+    let cut = 0
+    while strdisplaywidth(strpart(name, cut)) > s:howm_name_width
+      let cut += len(matchstr(name, '^.', cut))
+    endwhile
+    if cut > 0
+      call add(w:howm_align_ids, matchaddpos('Conceal',
+            \ [[lnum, len(scheme) + 1, cut]], 10, -1, {'conceal': ''}))
+    endif
+    let shown = strdisplaywidth(scheme . strpart(name, cut) . num)
+    call add(rows, [lnum, len(scheme . name . num) + 1, shown])
+  endfor
+  if empty(rows) | return | endif
+  " 一番長い行に合わせて、短い行の後ろに表示だけの空白を足す
+  let target = max(map(copy(rows), 'v:val[2]'))
+  for [lnum, col, shown] in rows
+    if shown < target
+      call prop_add(lnum, col, {'type': 'howm_pad', 'text': repeat(' ', target - shown)})
+    endif
+  endfor
+  setlocal conceallevel=2 concealcursor=nc
+endfunction
+
+augroup HowmMenuAlign
+  autocmd!
+  autocmd BufWinEnter,BufEnter * call s:HowmMenuAlign()
+augroup END
+" }}}
+" マークダウンファイルでのTodoハイライト設定 {{{
 augroup markdown_todo
   autocmd!
   " `projectlocal.markdown.project` のようなfiletypeへの対応
@@ -1621,6 +1673,7 @@ function! s:SetupMarkdownTodoHighlights()
   highlight TodoDone ctermfg=LightGreen guifg=#505050 cterm=none gui=italic
   highlight TodoCancelled ctermfg=LightYellow guifg=#505050 cterm=none gui=strikethrough
 endfunction
+" }}}
 " }}}
 " sonic template の設定 {{{
 let g:sonictemplate_vim_template_dir = expand('~/.vim/settings/sonictemplate/templates')
