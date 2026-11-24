@@ -1585,6 +1585,13 @@ if !isdirectory(expand(get(g:, 'howm_dir', '~/howm')))
   let g:disable_qfixmemo = 1
 endif
 
+" vim-markdown の折りたたみが閉じた状態だと、qfixhowm がメニュー作成時に実行する
+" `:$delete` が折りたたみ全体(--- 行の手前から末尾まで)を削除してしまうため、メニューでは折りたたみを無効化する
+augroup HowmMenuNoFold
+  autocmd!
+  autocmd FileType markdown if bufname('%') =~# '__HOWM_MENU__$' | setlocal nofoldenable | endif
+augroup END
+
 " QFixHowm のキーバインドが動作しなくなったときにリカバリーする
 function! RecoveryHowmKeybind()
   nnoremap <buffer> <silent> <CR> :call QFixMemoUserModeCR()<CR>
