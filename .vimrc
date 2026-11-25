@@ -13,6 +13,7 @@ set ignorecase
 set smartcase
 set	backup
 set relativenumber " カーソルからの相対位置を表示
+set number
 set wrap  " 折り返し表示
 
 set noincsearch
@@ -962,6 +963,32 @@ nnoremap <C-W><C-U><C-T> :<C-U>e ++enc=utf8<CR>
 nnoremap ,,n :set number!<CR>
 " 相対行番号のトグル: relativenumber と norelativenumber をトグル
 nnoremap ,,r :set relativenumber!<CR>
+" relativenumber でカーソルより上(LineNrAbove)と下(LineNrBelow)の行番号を、目立たない程度に色分けする
+" GUI は LineNr の文字色に orange(上)/cyan(下)を 4 割混ぜ、背景は LineNr と同じ。端末は 256 色のくすんだ色
+" (violet は LineNr の青みがかった灰色に近く見分けにくいので、上は暖色・下は寒色にしている)
+" カラースキームの読み込み・background の切替で色が初期化されるので、そのたびに付け直す
+let s:linenr_tint = {'Above': ['#cb4b16', 137], 'Below': ['#2aa198', 109]}
+function! s:LineNrTint() abort
+  let l:id = synIDtrans(hlID('LineNr'))
+  let l:fg = synIDattr(l:id, 'fg#', 'gui')
+  let l:bg = synIDattr(l:id, 'bg#', 'gui')
+  let l:cbg = synIDattr(l:id, 'bg', 'cterm')
+  if l:fg !~# '^#\x\{6}$'
+    let l:fg = &background ==# 'light' ? '#93a1a1' : '#586e75'
+  endif
+  for [l:pos, l:c] in items(s:linenr_tint)
+    let l:mix = '#' . join(map(range(3), {_, i -> printf('%02x', float2nr(round(
+      \ str2nr(l:fg[1 + i * 2 : 2 + i * 2], 16) * 0.6 + str2nr(l:c[0][1 + i * 2 : 2 + i * 2], 16) * 0.4)))}), '')
+    execute 'highlight LineNr' . l:pos . ' guifg=' . l:mix . ' guibg=' . (l:bg =~# '^#\x\{6}$' ? l:bg : 'NONE')
+      \ . ' ctermfg=' . l:c[1] . ' ctermbg=' . (empty(l:cbg) ? 'NONE' : l:cbg)
+  endfor
+endfunction
+augroup MyLineNrTint
+  autocmd!
+  autocmd ColorScheme * call s:LineNrTint()
+  autocmd OptionSet background call s:LineNrTint()
+augroup END
+call s:LineNrTint()
 " }}}
 " wrap表示関連 {{{
 " wrap設定のトグル: wrap と nowrap をトグル
