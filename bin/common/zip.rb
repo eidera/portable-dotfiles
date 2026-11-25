@@ -29,7 +29,7 @@ module ZipFileUtils
     src = File.expand_path(src)
     dest = File.expand_path(dest)
     File.unlink(dest) if File.exist?(dest)
-    Zip::File.open(dest, Zip::File::CREATE) {|zf|
+    open_for_create(dest) {|zf|
       if(File.file?(src))
         zf.add(encode_path(File.basename(src), options[:fs_encoding]), src)
         break
@@ -50,7 +50,7 @@ module ZipFileUtils
   # options :fs_encoding=[UTF-8,Shift_JIS,EUC-JP]
   def self.unzip(src, dest, options = {})
     FileUtils.makedirs(dest)
-    Zip::ZipInputStream.open(src){ |is|
+    Zip::InputStream.open(src){ |is|
       loop do
         entry = is.get_next_entry()
         break if entry.nil?()
@@ -70,6 +70,16 @@ module ZipFileUtils
   end
   
   private
+  # rubyzip 2.x 以前は第2引数に Zip::File::CREATE を渡し、
+  # rubyzip 3.0 以降は create: キーワードを渡す(CREATE 定数は 3.0 で削除)
+  def self.open_for_create(dest, &block)
+    if defined?(Zip::File::CREATE)
+      Zip::File.open(dest, Zip::File::CREATE, &block)
+    else
+      Zip::File.open(dest, create: true, &block)
+    end
+  end
+
   def self.each_dir_for(dir_path, &block)
     dir = Dir.open(dir_path)
     each_file_for(dir_path){ |file_path|
