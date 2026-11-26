@@ -966,13 +966,18 @@ nnoremap ,,r :set relativenumber!<CR>
 " relativenumber でカーソルより上(LineNrAbove)と下(LineNrBelow)の行番号を、目立たない程度に色分けする
 " GUI は LineNr の文字色に orange(上)/cyan(下)を 4 割混ぜ、背景は LineNr と同じ。端末は 256 色のくすんだ色
 " (violet は LineNr の青みがかった灰色に近く見分けにくいので、上は暖色・下は寒色にしている)
-" カラースキームの読み込み・background の切替で色が初期化されるので、そのたびに付け直す
+" 端末では LineNr の文字色(既定の 130)が上の 137 と近く見分けにくいので、LineNr の ctermfg だけ変える(GUI の色は変えない)
+" 色は端末の solarized の 10 番(base01)。0〜15 番は端末の配色の色が出るので dark / light のどちらでも見える
+" (240 などの 256 色の番号は固定の色なので、dark では暗すぎ、light ではまぶしくなる。iTerm の Solarized 配色が前提)
+" カラースキームの読み込み・background の切替・起動完了で色が初期化されることがあるので、そのたびに付け直す
 let s:linenr_tint = {'Above': ['#cb4b16', 137], 'Below': ['#2aa198', 109]}
+let s:linenr_cterm_fg = 10
 function! s:LineNrTint() abort
   let l:id = synIDtrans(hlID('LineNr'))
   let l:fg = synIDattr(l:id, 'fg#', 'gui')
   let l:bg = synIDattr(l:id, 'bg#', 'gui')
   let l:cbg = synIDattr(l:id, 'bg', 'cterm')
+  execute 'highlight LineNr ctermfg=' . s:linenr_cterm_fg
   if l:fg !~# '^#\x\{6}$'
     let l:fg = &background ==# 'light' ? '#93a1a1' : '#586e75'
   endif
@@ -987,6 +992,7 @@ augroup MyLineNrTint
   autocmd!
   autocmd ColorScheme * call s:LineNrTint()
   autocmd OptionSet background call s:LineNrTint()
+  autocmd VimEnter * call s:LineNrTint()
 augroup END
 call s:LineNrTint()
 " }}}
