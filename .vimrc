@@ -812,6 +812,141 @@ nnoremap <C-W><C-Y> :<C-U>call <SID>CopyFileRef()<CR>
 nnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(0)<CR>
 xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
 " }}}
+" セッション保存・復元（明示実行のみ） {{{
+" ~/.session.vim/ 配下に YYYY-MM-DD_HH:MM:SS[_コメント].vim（ローカルTZ）で保存。終了時・起動時の自動はしない
+" 保存時に任意コメント可。復元・削除は常に選択式。一覧は新しい順（先頭＝最新）
+set sessionoptions=blank,buffers,curdir,folds,help,tabpages,winsize,winpos
+let s:session_dir = expand('~/.session.vim')
+
+function! s:SessionStamp() abort
+  return strftime('%Y-%m-%d_%H:%M:%S')
+endfunction
+
+function! s:SessionSanitizeComment(comment) abort
+  let l:c = substitute(a:comment, '[\r\n\t]', ' ', 'g')
+  let l:c = substitute(l:c, '[/\\:*?"<>|]', '', 'g')
+  let l:c = substitute(l:c, '\s\+', '_', 'g')
+  let l:c = substitute(l:c, '^_\+\|_\+$', '', 'g')
+  return l:c
+endfunction
+
+function! s:SessionNewPath(...) abort
+  let l:stamp = s:SessionStamp()
+  let l:comment = s:SessionSanitizeComment(get(a:, 1, ''))
+  let l:base = l:stamp . (empty(l:comment) ? '' : '_' . l:comment)
+  let l:path = s:session_dir . '/' . l:base . '.vim'
+  let l:i = 1
+  while filereadable(l:path)
+    let l:path = s:session_dir . '/' . l:base . '_' . l:i . '.vim'
+    let l:i += 1
+  endwhile
+  return l:path
+endfunction
+
+function! s:SessionList() abort
+  if !isdirectory(s:session_dir)
+    return []
+  endif
+  let l:files = glob(s:session_dir . '/*.vim', 0, 1)
+  call sort(l:files)
+  call reverse(l:files)
+  return l:files
+endfunction
+
+function! s:SessionPathByName(name) abort
+  let l:path = s:session_dir . '/' . a:name
+  return filereadable(l:path) ? l:path : ''
+endfunction
+
+function! s:SessionSave() abort
+  if !isdirectory(s:session_dir)
+    call mkdir(s:session_dir, 'p')
+  endif
+  let l:comment = input('Session comment (optional): ')
+  redraw
+  let l:path = s:SessionNewPath(l:comment)
+  execute 'mksession!' fnameescape(l:path)
+  echo 'Session saved: ' . l:path
+endfunction
+
+function! s:SessionLoadFrom(path) abort
+  if !filereadable(a:path)
+    echoerr 'Session file not found: ' . a:path
+    return
+  endif
+  execute 'source' fnameescape(a:path)
+  echo 'Session loaded: ' . a:path
+endfunction
+
+function! s:SessionLoadSink(name) abort
+  let l:path = s:SessionPathByName(a:name)
+  if empty(l:path)
+    echoerr 'Session not found: ' . a:name
+    return
+  endif
+  call s:SessionLoadFrom(l:path)
+endfunction
+
+function! s:SessionLoad() abort
+  let l:files = s:SessionList()
+  if empty(l:files)
+    echo 'No sessions'
+    return
+  endif
+  let l:names = map(copy(l:files), 'fnamemodify(v:val, ":t")')
+  if exists('*fzf#run') && exists('*fzf#wrap')
+    call fzf#run(fzf#wrap({
+      \ 'source': l:names,
+      \ 'sink': function('s:SessionLoadSink'),
+      \ 'options': ['--prompt=SessionLoad> ', '--layout=reverse', '--height=~50%', '--cycle', '--no-multi'],
+    \ }))
+  else
+    let l:n = inputlist(['Sessions:'] + map(copy(l:names), 'printf("%d. %s", v:key + 1, v:val)'))
+    if l:n >= 1 && l:n <= len(l:files)
+      call s:SessionLoadFrom(l:files[l:n - 1])
+    endif
+  endif
+endfunction
+
+function! s:SessionClearSink(names) abort
+  if empty(a:names)
+    return
+  endif
+  let l:deleted = 0
+  for l:name in a:names
+    let l:path = s:SessionPathByName(l:name)
+    if !empty(l:path) && delete(l:path) == 0
+      let l:deleted += 1
+    endif
+  endfor
+  echo printf('Deleted %d session(s)', l:deleted)
+endfunction
+
+function! s:SessionClear() abort
+  let l:files = s:SessionList()
+  if empty(l:files)
+    echo 'No sessions'
+    return
+  endif
+  let l:names = map(copy(l:files), 'fnamemodify(v:val, ":t")')
+  if exists('*fzf#run') && exists('*fzf#wrap')
+    call fzf#run(fzf#wrap({
+      \ 'source': l:names,
+      \ 'sink*': function('s:SessionClearSink'),
+      \ 'options': ['--prompt=SessionClear> ', '--layout=reverse', '--height=~50%', '--cycle', '--multi'],
+    \ }))
+  else
+    let l:n = inputlist(['Delete session:'] + map(copy(l:names), 'printf("%d. %s", v:key + 1, v:val)'))
+    if l:n >= 1 && l:n <= len(l:files)
+      call s:SessionClearSink([l:names[l:n - 1]])
+    endif
+  endif
+endfunction
+
+command! SessionSave call s:SessionSave()
+command! SessionLoad call s:SessionLoad()
+command! SessionClear call s:SessionClear()
+" }}}
 " コマンドパレット {{{
 " ,<Space>(カンマ + スペース)で主なキーを、キーか機能名で絞り込んで実行する(ビジュアルモードから開くとビジュアル用だけ)
 " 一覧は [キー(マッピングの表記), モード(n / x), 機能名]。増やすときはここに1行足す
@@ -820,6 +955,11 @@ xnoremap <silent> ,,o :<C-U>call <SID>OpenUnderCursor(1)<CR>
 " サブメニューは キーを '' にし、4つ目に {'menu': 名前} を書く。中身は s:palette_menus[名前] に同じ形式で並べる
 " サブメニューの中にも 'menu' の項目を置ける(何段でも)。中に出せる項目がないサブメニューは一覧に出さない
 let s:palette_menus = {
+  \ 'session': [
+  \   ['', 'n', 'セッションを保存 SessionSave', {'run': 'SessionSave'}],
+  \   ['', 'n', 'セッションを復元 SessionLoad', {'run': 'SessionLoad', 'when': '!empty(s:SessionList())'}],
+  \   ['', 'n', 'セッションを選択削除 SessionClear', {'run': 'SessionClear', 'when': '!empty(s:SessionList())'}],
+  \ ],
   \ 'utilities': [
   \   [',cdf', 'n', 'このウィンドウのカレントディレクトリを開いているファイルの場所に(lcd)'],
   \   [',cdp', 'n', 'このウィンドウのカレントディレクトリをプロジェクトのルートに(lcd)'],
@@ -834,6 +974,7 @@ let s:palette_items = [
   \ ['<C-W><C-Y>', 'n', '開いているファイルのパス・リンクをコピー'],
   \ [',,o', 'n', 'カーソル下のファイル/URL/リンクを開く'],
   \ [',,o', 'x', '選択範囲のファイル/URL/リンクを開く'],
+  \ ['', 'n', 'session ...', {'menu': 'session'}],
   \ ['', 'n', 'utilities ...', {'menu': 'utilities'}],
   \ ]
 
@@ -865,19 +1006,44 @@ function! s:PaletteEntries(mode, items, ...) abort
   return l:res
 endfunction
 
+" 直前の fzf 確定(Enter)などが typeahead に残ると、次の fzf の最初のキーが無視されることがあるので捨てる
+function! s:PaletteFlushKeys() abort
+  while getchar(0)
+  endwhile
+endfunction
+
+" timer 経由で開いた fzf は startinsert が効かず Terminal-Normal のままになり、最初のキーが「挿入開始」に食われることがある
+" feedkeys('i') はコールバック復帰後に効くので、そのときだけ使う(,Space 直開きでは使わない)
+let s:palette_need_insert = 0
+function! s:PaletteEnsureInsert() abort
+  if !s:palette_need_insert
+    return
+  endif
+  let s:palette_need_insert = 0
+  call s:PaletteFlushKeys()
+  if &filetype ==# 'fzf'
+    call feedkeys('i', 'n')
+  endif
+endfunction
+
 function! s:PaletteExec(cmd, ...) abort
+  call s:PaletteFlushKeys()
   execute a:cmd
+  call s:PaletteEnsureInsert()
 endfunction
 
 " 選んだ項目を実行する。キーは押したのと同じように送る(ビジュアルは gv で選択し直してから)
 " コマンドとサブメニューは fzf を閉じて元のウィンドウに戻ってから実行する(開く)
+" 遅延は前の fzf の teardown と Enter の食い残り対策
 function! s:PaletteRun(mode, item) abort
   let l:opt = get(a:item, 3, {})
   if has_key(l:opt, 'menu')
-    call timer_start(0, function('s:Palette', [a:mode, s:palette_path + [l:opt.menu]]))
+    let s:palette_need_insert = 1
+    call timer_start(20, function('s:Palette', [a:mode, s:palette_path + [l:opt.menu]]))
     return
   elseif has_key(l:opt, 'run')
-    call timer_start(0, function('s:PaletteExec', [l:opt.run]))
+    let s:palette_need_insert = 1
+    call timer_start(20, function('s:PaletteExec', [l:opt.run]))
     return
   endif
   if a:mode ==# 'x'
@@ -895,12 +1061,14 @@ endfunction
 
 " a:1 は開くサブメニューの名前の並び(['utilities'] なら utilities。省略で一番上)
 function! s:Palette(mode, ...) abort
+  call s:PaletteFlushKeys()
   let s:palette_mode = a:mode
   let s:palette_path = get(a:, 1, [])
   let l:items = empty(s:palette_path) ? s:palette_items : get(s:palette_menus, s:palette_path[-1], [])
   let s:palette_current = s:PaletteEntries(a:mode, l:items)
   let l:title = join(['palette'] + s:palette_path, '/')
   if empty(s:palette_current)
+    let s:palette_need_insert = 0
     echo l:title . ': 使えるキーがありません'
     return
   endif
@@ -914,7 +1082,9 @@ function! s:Palette(mode, ...) abort
       \ 'options': ['--prompt=' . l:title . '> ', '--layout=reverse', '--height=~50%', '--cycle', '--no-multi',
       \              '--delimiter=' . "\t", '--with-nth=2..'],
       \ }))
+    call s:PaletteEnsureInsert()
   else
+    let s:palette_need_insert = 0
     let l:n = inputlist([l:title . ':'] + map(copy(l:lines), 'substitute(v:val, "\t", ". ", "")'))
     if l:n >= 1 && l:n <= len(l:lines)
       call s:PaletteSink(l:lines[l:n - 1])
